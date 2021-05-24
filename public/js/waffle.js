@@ -19,10 +19,10 @@ function toggleInNeed(inNeed) {
 
 function toggleCategory(catId) {
 	var curSrc = $("#disclosure_"+catId)[0].src.substring($("#disclosure_"+catId)[0].src.length - 24);
-	if (curSrc == "images/triangle-down.png") {
-		$("#disclosure_"+catId)[0].src = "images/triangle-right.png";
+	if (curSrc == "/images/triangle-down.png") {
+		$("#disclosure_"+catId)[0].src = "/images/triangle-right.png";
 	} else {
-		$("#disclosure_"+catId)[0].src = "images/triangle-down.png";
+		$("#disclosure_"+catId)[0].src = "/images/triangle-down.png";
 	}
 	$("#subcat-"+catId+"-tasks").toggle("blind");
 }

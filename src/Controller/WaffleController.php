@@ -45,12 +45,12 @@ class WaffleController extends AbstractController {
                     }
             
                     if ($TaskDef->getRedDays() != null) {
-                        error_log('Checking red status for '.$TaskDef->getName().' ('.$TaskDef->getRedDays().')...');
+                       // error_log('Checking red status for '.$TaskDef->getName().' ('.$TaskDef->getRedDays().')...');
                         $redDays = intval($TaskDef->getRedDays());
                         $redTime = $now->sub(new \DateInterval('P'.$redDays.'D'));
-                        error_log('Red time: '.$redTime->format('Y-m-d'));
+                        //error_log('Red time: '.$redTime->format('Y-m-d'));
                         if ($lastDone && $lastDone->getDoneOn() < $redTime) {
-                            error_log($lastDone->getDoneOn()->format('Y-m-d').' is red');
+                            //error_log($lastDone->getDoneOn()->format('Y-m-d').' is red');
                             $TaskDef->setRed(true);
                             if (!isset($redTasks[$TaskDef->getCategory()->getParent()->getId()])) {
                                 $redTasks[$TaskDef->getCategory()->getParent()->getId()] = array();
@@ -60,9 +60,10 @@ class WaffleController extends AbstractController {
                             }
                             $redTasks[$TaskDef->getCategory()->getParent()->getId()][$TaskDef->getCategory()->getId()] []= $TaskDef;
                             $redCount++;
-                        } else if ($lastDone) {
-                            error_log($lastDone->getDoneOn()->format('Y-m-d').' is just fine');
-                        }
+                        } 
+                        // else if ($lastDone) {
+                        //     error_log($lastDone->getDoneOn()->format('Y-m-d').' is just fine');
+                        // }
                     }
                 }
             }
