@@ -180,3 +180,32 @@ h3 {
 	top: 0.2em;
 	right: 0.2em;
 }
+
+#waffleDevice {
+	display: none;
+	color: black;
+}
+
+#waffleDevice p {
+	padding: 0.5em;
+	color: black;
+}
+
+h1 {
+	margin-bottom: 0.3em;
+}
+
+#waffleGreeting {
+	color: black;
+	padding: 0px;
+	margin-top: 0.3em;
+}
+
+.notMine {
+	border-color: lightblue;
+	color: darkgray;
+}
+
+.notMine.red {
+	color: color(srgb 0.988 0.449 0.449);
+}

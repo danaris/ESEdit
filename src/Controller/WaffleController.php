@@ -11,6 +11,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\TaskDefinition;
 use App\Entity\TaskDone;
 use App\Entity\TaskCategory;
+use App\Entity\WaffleDevice;
 
 class WaffleController extends AbstractController {
     
@@ -20,6 +21,15 @@ class WaffleController extends AbstractController {
         $this->em = $em;
     }
     
+    function whichWaffle($ip) {
+        $device = $this->em->getRepository(WaffleDevice::class)->findOneBy(['ipAddress'=>$ip]);
+        if ($device) {
+            return $device->getWaffleName();
+        } else {
+            return null;
+        }
+    }
+    
     /**
      * @Route("/waffle/", name="WaffleTracker")
      */
@@ -27,6 +37,8 @@ class WaffleController extends AbstractController {
         
         $categoryQ = $this->em->createQuery('Select c from App\Entity\TaskCategory c where c.parent is NULL order by c.viewOrder');
         $categories = $categoryQ->getResult();
+        
+        $waffle = $this->whichWaffle($request->getClientIp());
         
         $taskTree = array();
         $tasksDone = array();
@@ -64,6 +76,12 @@ class WaffleController extends AbstractController {
                         // else if ($lastDone) {
                         //     error_log($lastDone->getDoneOn()->format('Y-m-d').' is just fine');
                         // }
+                    } else if ($TaskDef->getInNeed()) {
+                        if (!isset($redTasks[$TaskDef->getCategory()->getParent()->getId()][$TaskDef->getCategory()->getId()])) {
+                            $redTasks[$TaskDef->getCategory()->getParent()->getId()][$TaskDef->getCategory()->getId()] = array();
+                        }
+                        $redTasks[$TaskDef->getCategory()->getParent()->getId()][$TaskDef->getCategory()->getId()] []= $TaskDef;
+                        $redCount++;
                     }
                 }
             }
@@ -76,8 +94,30 @@ class WaffleController extends AbstractController {
         $data['redCount'] = $redCount;
         $today = new \DateTime();
         $data['today'] = $today->format('Y-m-d');
+        $data['waffle'] = $waffle;
         
         return $this->render('index.html.twig', $data);
+    }
+    
+    /**
+     * @Route("/waffle/addDevice", name="WaffleAddDevice")
+     */
+    public function addDevice(Request $request) {
+        $deviceIP = $request->getClientIp();
+        $waffleName = $request->request->get('waffleName');
+        
+        $dupeCheck = $this->whichWaffle($deviceIP);
+        if (!$dupeCheck) {
+            $Device = new WaffleDevice();
+            $Device->setIpAddress($deviceIP);
+            $Device->setWaffleName($waffleName);
+            $this->em->persist($Device);
+            $this->em->flush();
+            
+            return $this->render('success.json.twig');
+        } else {
+            return $this->render('error.json.twig', ['error'=>'IP address '.$deviceIP.' already belongs to '.$dupeCheck.'. Talk to Timothy if that\'s wrong.']);
+        }
     }
     
     /**
@@ -105,12 +145,8 @@ class WaffleController extends AbstractController {
             $TaskDone->setDefinition($TaskDef);
             $TaskDone->setDoneOn(new \DateTime($date));
             
-            $who = array('192.168.77.51'=>'Timothy', '192.168.77.49'=>'Timothy', '192.168.77.52'=>'Corine', '192.168.77.53'=>'Josh', '192.168.77.55'=>'Josh', '::1'=>'Timothy', '127.0.0.1'=>'Timothy');
+            $doneBy = $this->whichWaffle($request->getClientIp());
             
-            $doneBy = $request->getClientIp();
-            if (isset($who[$doneBy])) {
-                $doneBy = $who[$doneBy];
-            }
             $TaskDone->setDoneBy($doneBy);
             if ($extra) {
                 $TaskDone->setExtra($extra);
@@ -141,6 +177,26 @@ class WaffleController extends AbstractController {
      * @Route("/waffle/api/tasks", name="APIGetTasks")
      */
     public function apiTasks(Request $request) {
+        $allTasks = $this->em->getRepository(TaskDefinition::class)->findAll();
         
+        foreach ($allTasks as $TaskDef) {
+            $now = new \DateTime();
+            
+            if (count($TaskDef->getInstances()) > 0) {
+                $lastDone = $TaskDef->getInstances()[0];
+            } else {
+                $lastDone = false;
+            }
+    
+            if ($TaskDef->getRedDays() != null) {
+                $redDays = intval($TaskDef->getRedDays());
+                $redTime = $now->sub(new \DateInterval('P'.$redDays.'D'));
+                if ($lastDone && $lastDone->getDoneOn() < $redTime) {
+                    $TaskDef->setRed(true);
+                }
+            }
+        }
+        
+        return $this->render('waffle/apiTasks.json.twig', ['tasks'=>$allTasks]);
     }
 }

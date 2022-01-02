@@ -4,10 +4,15 @@
 <script>
 $(function() {
 	taskUrl = '{{ path("WaffleTaskMark") }}';
+	deviceUrl = '{{ path("WaffleAddDevice") }}';
 	$("#needSwitch").switchButton({
 		on_label: 'In Need',
 		off_label: 'Done'
 	});
+	{% if not waffle %}
+	$("#waffleDevice").dialog();
+	$("#waffleDevice").show();
+	{% endif %}
 });
 </script>
 {% endblock %}
@@ -16,6 +21,13 @@ $(function() {
 <input type="checkbox" onchange="toggleInNeed(this.checked);" value="1" id="needSwitch">
 <div id="dateContainer"><input id="date" type="date" value="{{ today }}"></div>
 <h1>Waffle Chore Tracking</h1>
+<p id="waffleGreeting">
+{% if waffle %}
+Hi, {{ waffle }} &#x1F601;
+{% else %}
+I don't know who you are &#x1F622;
+{% endif %}
+</p>
 
 <div id="taskTabs">
 	<ul>
@@ -36,7 +48,7 @@ $(function() {
 				{% set lastDone = tasks[taskDef.id].donePretty %}
 				{% set lastExtra = tasks[taskDef.id].extra %}
 			{% endif %}
-			<div class="taskBox{% if taskDef.red %} red{% endif %}{% if taskDef.inNeed %} ui-state-highlight taskInNeed{% endif %}" id="task-{{ taskDef.id }}">
+			<div class="taskBox{% if taskDef.red %} red{% endif %}{% if taskDef.inNeed %} ui-state-highlight taskInNeed{% endif %}{% if not taskDef.belongsToWaffle(waffle) %} notMine{% endif %}" id="task-{{ taskDef.id }}">
 				<div class="taskName">{{ taskDef.name|raw }}</div>
 				<div class="taskLast" id="last-{{ taskDef.id }}">{{ lastDone }}</div>
 				{% if taskDef.extra %}
@@ -65,7 +77,7 @@ $(function() {
 						{% set lastDone = tasks[taskDef.id].donePretty %}
 						{% set lastExtra = tasks[taskDef.id].extra %}
 					{% endif %}
-			<div class="taskBox red" id="red-task-{{ taskDef.id }}">
+			<div class="taskBox red{% if not taskDef.belongsToWaffle(waffle) %} notMine{% endif %}" id="red-task-{{ taskDef.id }}">
 				<div class="taskName">{{ taskDef.name|raw }}</div>
 				<div class="taskLast" id="red-last-{{ taskDef.id }}">{{ lastDone }}</div>
 				{% if taskDef.extra %}
@@ -80,5 +92,10 @@ $(function() {
 			{% endfor %}
 		{% endfor %}
 	</div>
+</div>
+<div id="waffleDevice" title="New Device">
+	<p id="waffleDeviceText">Please tell me which Waffle this is, so I can identify you on this device!</p>
+	<p style="text-align: center;"><select name="waffleName" id="waffleNameSelect"><option>Corine</option><option>Josh</option><option>Timothy</option></select></p>
+	<p style="text-align: center;"><button type="button" id="waffleDeviceButton" onclick="setWaffleName();">Set Name</button></p>
 </div>
 {% endblock %}

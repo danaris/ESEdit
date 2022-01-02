@@ -205,4 +205,18 @@ class TaskDefinition
 
         return $this;
     }
+    
+    public function belongsToWaffle($waffle) {
+        if ($this->belongsTo) {
+            $belong = $this->belongsTo == "All Wafs" || str_contains($this->belongsTo, $waffle);
+            // $is = 'is';
+            // if (!$belong) {
+            //     $is = 'is not';
+            // }
+            //error_log("Task ".$this->name." belongs to ".$this->belongsTo.", which $is the same as ".$waffle);
+        } else {
+            $belong = true;
+        }
+        return $belong;
+    }
 }

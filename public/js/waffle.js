@@ -1,5 +1,6 @@
 var tabs;
 var taskUrl;
+var deviceUrl;
 $(function() {
 	tabs = $("#taskTabs").tabs();
 	$(".subcategory").effect("blind");
@@ -19,7 +20,7 @@ function toggleInNeed(inNeed) {
 
 function toggleCategory(catId) {
 	var curSrc = $("#disclosure_"+catId)[0].src.substring($("#disclosure_"+catId)[0].src.length - 24);
-	if (curSrc == "/images/triangle-down.png") {
+	if (curSrc.includes("down")) {
 		$("#disclosure_"+catId)[0].src = "/images/triangle-right.png";
 	} else {
 		$("#disclosure_"+catId)[0].src = "/images/triangle-down.png";
@@ -77,4 +78,21 @@ function markTaskInNeed(taskId) {
 		},
 		dataType: 'json'
 	});
+}
+
+function setWaffleName() {
+	var waffleName = $("#waffleNameSelect").val();
+	var xhrPost = $.ajax({
+		type: "POST",
+		url: deviceUrl,
+		data: {waffleName: waffleName},
+		success: function (data) {
+			if (data.error) {
+				$("#waffleDeviceText").text(data.error);
+			} else {
+				$("#waffleDevice").dialog("close");
+				$("#waffleGreeting").html("Hi, "+waffleName+" &#x1F601;");
+			}
+		}
+	})
 }
