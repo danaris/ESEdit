@@ -97,7 +97,17 @@ class NotifyCommand extends Command {
 			}
 		}
 		
-		$email = (new TemplatedEmail())->from('noreply@home.topazgryphon.org')->to('danaris@mac.com')->addTo('penguinpi@gmail.com')->addTo('jmiller@colgate.edu')->subject('Waffle Notification Test')->text($text)->htmlTemplate('waffle/notifyEmail.html.twig')->context(['needCount'=>$needCount,'needTasks'=>$needTasks,'tasks'=>$doneTasks]);
+		$today = new \DateTime();
+		$subject = 'Waffle Tracker '.$today->format('Y-m-d').': '.$needCount.' ';
+		if ($needCount == 1) {
+			$subject .= 'Task';
+		} else {
+			$subject .= 'Tasks';
+		}
+		$email = (new TemplatedEmail())->from('noreply@home.topazgryphon.org')->to('danaris@mac.com')->addTo('petridishgames@gmail.com')->subject($subject)->text($text)->htmlTemplate('waffle/notifyEmail.html.twig')->context(['needCount'=>$needCount,'needTasks'=>$needTasks,'tasks'=>$doneTasks]);
+		if ($today->format('D') == 'Fri') {
+			$email->addTo('penguinpi@gmail.com');
+		}
 		
 		try {
 			$this->mailer->send($email);
