@@ -21,6 +21,13 @@
     <title>{% block title %}Waffle Tracking{% endblock %}</title>
 </head>
 <body>
+    {% for label, messages in app.flashes %}
+    {% for message in messages %}
+        <div class="flash-{{ label }}">
+            {{ message }}
+        </div>
+    {% endfor %}
+    {% endfor %}
 <div id="content">
     {% block content %}
     {% endblock %}
