@@ -39,6 +39,9 @@ class NotifyCommand extends Command {
 		foreach ($allCategories as $Category) {
 			foreach ($Category->getChildren() as $Subcategory) {
 				foreach ($Subcategory->getTasks() as $TaskDef) {
+					if (!$TaskDef->getEnabled()) {
+						continue;
+					}
 					if ($TaskDef->getInNeed()) {
 						if (!isset($needTasks[$TaskDef->getCategory()->getParent()->getId()])) {
 							$needTasks[$TaskDef->getCategory()->getParent()->getId()] = array();

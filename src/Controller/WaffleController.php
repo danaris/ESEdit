@@ -47,6 +47,9 @@ class WaffleController extends AbstractController {
         foreach ($categories as $Category) {
             foreach ($Category->getChildren() as $Subcategory) {
                 foreach ($Subcategory->getTasks() as $TaskDef) {
+                    if (!$TaskDef->getEnabled()) {
+                        continue;
+                    }
                     $now = new \DateTime();
                     
                     if (count($TaskDef->getInstances()) > 0) {

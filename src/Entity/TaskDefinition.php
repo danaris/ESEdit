@@ -69,6 +69,11 @@ class TaskDefinition
     /* Unmapped bool */
     private $red;
 
+    /**
+     * @ORM\Column(type="boolean")
+     */
+    private $enabled;
+
     public function __construct()
     {
         $this->instances = new ArrayCollection();
@@ -207,6 +212,9 @@ class TaskDefinition
     }
     
     public function belongsToWaffle($waffle) {
+        if (!$waffle) {
+            $waffle = 'none';
+        }
         if ($this->belongsTo) {
             $belong = $this->belongsTo == "All Wafs" || str_contains($this->belongsTo, $waffle);
             // $is = 'is';
@@ -218,5 +226,17 @@ class TaskDefinition
             $belong = true;
         }
         return $belong;
+    }
+
+    public function getEnabled(): ?bool
+    {
+        return $this->enabled;
+    }
+
+    public function setEnabled(bool $enabled): self
+    {
+        $this->enabled = $enabled;
+
+        return $this;
     }
 }
