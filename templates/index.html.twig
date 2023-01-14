@@ -23,7 +23,7 @@ $(function() {
 <h1>Waffle Chore Tracking</h1>
 <p id="waffleGreeting">
 {% if waffle %}
-Hi, {{ waffle }} &#x1F601;
+Hi, <span title="{{ waffleIp }}">{{ waffle }}</span> &#x1F601;
 {% else %}
 I don't know who you are &#x1F622;
 {% endif %}
