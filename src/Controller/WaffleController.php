@@ -98,6 +98,7 @@ class WaffleController extends AbstractController {
         $today = new \DateTime();
         $data['today'] = $today->format('Y-m-d');
         $data['waffle'] = $waffle;
+        $data['waffleIp'] = $request->getClientIp();
         
         return $this->render('index.html.twig', $data);
     }
