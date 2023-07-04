@@ -1,7 +1,0 @@
-{
-	"games": [
-		{% for game in games %}
-		{ "name": "{{ game.name }}", "id": {{ game.id }} }{% if game != games|last %},{% endif %}
-		{% endfor %}
-	]
-}

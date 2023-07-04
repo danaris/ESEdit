@@ -6,34 +6,37 @@ use Doctrine\DBAL\Platforms\AbstractPlatform;
 use geoPHP;
 
 class Polygon extends Type {
-	public function getName() {
+	public function getName(): string {
 		return 'polygon';
 	}
 
-	public function getSqlDeclaration(array $fieldDeclaration, AbstractPlatform $platform) {
+	public function getSqlDeclaration(array $fieldDeclaration, AbstractPlatform $platform): string {
 		return 'POLYGON';
 	}
 
-	public function convertToPHPValue($value, AbstractPlatform $platform) {
+	/**
+	 * @return mixed
+	 */
+	public function convertToPHPValue($value, AbstractPlatform $platform): mixed {
 		if ($value) {
 			$value = geoPHP::load($value, 'wkb');
 		}
 		return $value;
 	}
 
-	public function convertToDatabaseValue($value, AbstractPlatform $platform) {
+	public function convertToDatabaseValue($value, AbstractPlatform $platform): mixed {
 		return $value->out('wkt');
 	}
 
-	public function canRequireSQLConversion() {
+	public function canRequireSQLConversion(): bool {
 		return true;
 	}
 
-	public function convertToPHPValueSQL($sqlExpr, $platform) {
+	public function convertToPHPValueSQL($sqlExpr, $platform): string {
 		return sprintf('AsBinary(%s)', $sqlExpr);
 	}
 
-	public function convertToDatabaseValueSQL($sqlExpr, AbstractPlatform $platform) {
+	public function convertToDatabaseValueSQL($sqlExpr, AbstractPlatform $platform): string {
 		return sprintf('GeomFromText(%s)', $sqlExpr);
 	}
 }

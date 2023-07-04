@@ -1,3 +1,1 @@
 services:
-    App\Twig\WaffleExtension:
-        tags: ['twig.extension']

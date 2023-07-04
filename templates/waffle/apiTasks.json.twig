@@ -1,6 +1,0 @@
-{
-	"tasks": [{% for index, task in tasks %}{% if index > 0 %},{% endif %}
-		{% include 'waffle/task.json.twig' %}
-		{% endfor %}
-	]
-}

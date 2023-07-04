@@ -1,8 +1,0 @@
-{
-	"id": {{ task.id }},
-	"name": "{{ task.name }}",
-	"category": "{{ task.category.parent.name }}",
-	"subcategory": "{{ task.category.name }}",
-	"red": {% if task.red %}true{% else %}false{% endif %},
-	"inNeed": {% if task.inNeed %}true{% else %}false{% endif %}
-}

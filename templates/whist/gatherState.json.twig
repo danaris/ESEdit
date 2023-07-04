@@ -1,7 +1,0 @@
-{
-	"players": [
-		{% for player in players %}
-		"{{ player.id }}"{% if player != players|last %},{% endif %}
-		{% endfor %}
-	]
-}

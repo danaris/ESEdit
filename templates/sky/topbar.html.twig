@@ -1,0 +1,86 @@
+{% set skyPlugins = skyPlugins() %}
+<script>
+function clearDataCache() {
+	$.ajax({
+			type: "GET",
+			url: '{{ path('SkyClearDataCache') }}',
+			data: {},
+			success: function (data) {
+				if (data.error) {
+					// TODO: errors
+				} else {
+					console.log('Cleared data cache');
+				}
+			},
+			dataType: 'json'
+		});
+}
+function clearImageCache() {
+	$.ajax({
+			type: "GET",
+			url: '{{ path('SkyClearImageCache') }}',
+			data: {},
+			success: function (data) {
+				if (data.error) {
+					// TODO: errors
+				} else {
+					console.log('Cleared image cache');
+				}
+			},
+			dataType: 'json'
+		});
+}
+$(function() {
+	$("#skyAddPluginDialog").dialog({
+		  autoOpen: false,
+		  height: 350,
+		  width: 550,
+		  modal: true,
+		  close: function() {
+			  $("#skyAddPluginDialog").dialog('close');
+		  },
+		  buttons: [{
+			  text: "Add",
+			  click: function() {
+				  var pluginName = $("#skyPluginName").val();
+				  var pluginPath = $("#skyPluginPath").val();
+				  $.ajax({
+					  type: "POST",
+					  url: '{{ path('SkyAddPlugin') }}',
+					  data: {pluginName: pluginName, pluginPath: pluginPath},
+					  success: function (data) {
+						  if (data.error) {
+							  // TODO: errors
+						  } else {
+							  var firstChild = $("#skyPluginNames").children()[0];
+							  if (firstChild.innerHTML == 'add a plugin') {
+							  	$("#skyPluginNames").html('');
+							  }
+							  $("#skyPluginNames").append('<option>'+pluginName+'</option>');
+							  $(this).dialog("close");
+						  }
+					  },
+					  dataType: 'json'
+				  });
+			  }
+		  }]
+		});
+});
+function addPlugin() {
+	$("#skyAddPluginDialog").dialog("open");
+}
+</script>
+<div id="skyTop">
+	<div id="skyConfigBase">{{ skyBasePath() }}</div>
+	<div id="skyConfigPlugins"><select id="skyPluginNames" name="plugins">{% if skyPlugins|length > 0 %}{% for plugin in skyPlugins %}<option>{{ plugin.name }}</option>{% endfor %}{% else %}<option disabled>add a plugin</option>{% endif %}</select> <button type="button" id="skyPluginDeleteButton"{% if skyPlugins|length == 0 %} disabled{% endif %} onclick="deletePlugin();">del</button> <button type="button" id="skyPluginAddButton" onclick="addPlugin();">add</button></div>
+	
+	<div id="skyCacheButtons"><button type="button" onclick="clearDataCache();">D</button> <button type="button" onclick="clearImageCache();">I</button></div>
+</div>
+<div id="skyAddPluginDialog" title="Add a Plugin">
+	<fieldset id="skyPluginFieldset">
+		<label for="skyPluginName">Name:</label>
+		<input id="skyPluginName" name="skyPluginName" type="text">
+		<label for="skyPluginPath">Path:</label>
+		<input id="skyPluginPath" name="skyPluginPath" type="text" style="width: 30em;"> 
+	</fieldset>
+</div>

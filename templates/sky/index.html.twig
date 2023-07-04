@@ -1,0 +1,14 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Endless Sky Editor{% endblock %}
+
+{% block content %}
+<p>Got the following data elements: 
+	<ul>
+	{% for name, val in data %}
+		<li>{% if val is iterable %}{{ val|length }} elements{% else %}one{% endif %} of type {% if name matches '/^\\d+$/' %}{% if val['_type'] is defined %}<a href="{{ path('SkyDataView', {dataType: val['_type']}) }}">{{ val['_type'] }}</a>{% else %}(unknown){% endif %}{% else %}<a href="{{ path('SkyDataView', {dataType: name}) }}">{{ name }}</a>{% endif %}</li>
+	{% endfor %}
+	</ul>
+</p>
+
+{% endblock %}

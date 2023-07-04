@@ -1,0 +1,112 @@
+
+body {
+	background-color: black;
+	color: white;
+}
+.debug {
+	color: pink;
+}
+.error {
+	display: block;
+}
+a:link {
+	color: skyblue;
+}
+a:link:hover {
+	color: aliceblue;
+}
+a:link:active {
+	color: white;
+}
+a:link:visited {
+	color: lightblue;
+}
+
+#skyLogo {
+	float: left;
+	z-index: 10;
+	position: absolute;
+	margin: 2px;
+	padding-top: 5px;
+}
+
+#skyInfo {
+	font: 18px "Caligula", Georgia, Times, Serif;
+	color: #eee;
+	height: 22px;
+	padding-top: 5px;
+	text-align: right;
+	margin-right: 20px;
+}
+
+#skyTop {
+	width: 100%;
+	min-width: 780px;
+	margin: 0;
+	height: 28px;
+	padding: 0;
+	background: #006;
+	z-index: 9;
+	position: fixed;
+	top: 0px;
+	left: 0px;
+	display: grid;
+	grid-template-columns: auto auto auto;
+}
+#skyTop ul {
+	list-style: none;
+	margin: 0 0 0 120px;
+	padding: 0;
+	height: 100%;
+}
+#skyCacheButtons {
+	justify-self: end;
+}
+#skyCacheButtons button {
+	background-color: red;
+}
+#skyAddPluginDialog {
+	display: none;
+}
+#skyPluginFieldset {
+	display: grid;
+	grid-template-columns: 6em auto;
+}
+
+#skyTop ul li {
+	float: left;
+	margin: 0;
+	padding: 0;
+	background: transparent url(/common/wood-bg.png) top left no-repeat;
+	height: 100%;
+}
+#skyTop ul.right li {
+	float: right;
+}
+
+#skyTop ul li a {
+	display: block;
+	float: left;
+	font: 18px "Caligula", Georgia, Times, Serif;
+	color: #eed;
+	text-decoration: none;
+	line-height: 1.5em;
+	height: 100%;
+	padding: 0 20px 0 20px;
+	background: transparent url(/common/wood-bg.png) top right no-repeat;
+	cursor: pointer;
+}
+#skyTop ul li a.icon {
+	padding: 0 10px 0 10px;
+}
+#skyTop ul li a.corelink {
+	color: #fea;
+}
+
+#skyTop ul li a img {
+	border: 0;
+}
+
+#content {
+	margin-top: 30px;
+}
