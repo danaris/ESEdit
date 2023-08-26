@@ -30,9 +30,9 @@ class SkyService {
 	protected array $elements = array();
 	protected array $data = array();
 	protected array $errors = array();
-	public string $basePath = '/Users/tcollett/Applications/Endless Sky.app/Contents/Resources/'; 
-	public string $dataBasePath = '/Users/tcollett/Applications/Endless Sky.app/Contents/Resources/data/';
-	public string $imageBasePath = '/Users/tcollett/Applications/Endless Sky.app/Contents/Resources/images/';
+	public string $basePath = ''; 
+	public string $dataBasePath = '';
+	public string $imageBasePath = '';
 	
 	public array $plugins = array();
 	
@@ -49,6 +49,9 @@ class SkyService {
 								protected SerializerInterface $serializer,
 								protected EntityManagerInterface $em,
 								$projectDir) {
+		$this->basePath = $_ENV['DATA_PATH'];
+		$this->dataBasePath = $_ENV['DATA_PATH'].'data/';
+		$this->imageBasePath = $_ENV['DATA_PATH'].'images/';
 		$this->configPath = $projectDir.$this->configPath;
 		$this->dataCachePath = $projectDir.$this->dataCachePath;
 		$this->universeCachePath = $projectDir.$this->universeCachePath;

@@ -3,7 +3,7 @@
 namespace App\Entity\Sky;
 
 use Doctrine\ORM\Mapping as ORM;
-use Doctrine\ORM\Event\PreUpdateEventArgs;
+use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 
 use App\Entity\DataNode;
