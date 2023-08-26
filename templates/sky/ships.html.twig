@@ -1,0 +1,104 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Ships ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<style>
+.category {
+	display: flex;
+	width: 100%;
+	flex-wrap: wrap;
+}
+.ship {
+	display: grid;
+	grid-template-columns: 20em auto;
+	flex-grow: 1;
+	border: 4px ridge darkgreen;
+	cursor: pointer;
+	padding: 1em;
+}
+.ship:hover {
+	background-color: darkgray;
+}
+.category a {
+	flex-grow: 1;
+	display: grid;
+	grid-template-columns: auto;
+	text-decoration: none;
+}
+.shipName {
+	align-self: center;
+	text-align: center;
+}
+.shipThumbnail {
+	align-self: center;
+	text-align: center;
+}
+.categoryHeader {
+	background-color: rgb(50,50,50);
+	border: 4px outset darkslateblue;
+	padding: 1em;
+	font-size: 150%;
+	text-align: center;
+	flex-grow: 5;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<script src="{{ path("SkyColorsJS") }}"></script>
+<script src="{{ path("SkySpritesJS") }}"></script>
+<script src="{{ path("SkyOutfitsJS") }}"></script>
+<script src="{{ path("SkyShipsJS") }}"></script>
+<script>
+var shipCategories = {};
+var shipImages = [];
+$(function() {
+	for (var shipId in ships) {
+		var ship = ships[shipId];
+		ship.attributesOutfit = outfits[ship.trueModelName+" Base Attributes"];
+		if (ship.variantName) {
+			continue;
+		}
+		if (shipCategories[ship.attributesOutfit.category] == undefined) {
+			shipCategories[ship.attributesOutfit.category] = [];
+		}
+		shipCategories[ship.attributesOutfit.category].push(ship);
+		if (ship.thumbnailId) {
+			var shipImage = new Image();
+			shipImage.src = '/skyImage/'+ship.thumbnailId;
+			shipImages.push(shipImage);
+		} else {
+			var shipImage = new Image();
+			shipImage.src = '/skyImage/'+ship.spriteId;
+			shipImages.push(shipImage);
+		}
+	}
+	$("#shipList").html('');
+	for (var categoryName in shipCategories) {
+		$("#shipList").append('<div class="categoryHeader">'+categoryName+'</div>');
+		var shipCategory = '<div class="category">';
+		for (var shipIndex in shipCategories[categoryName]) {
+			var ship = shipCategories[categoryName][shipIndex];
+			var shipDisplay = '<a href="/sky/ship/'+ship.id+'"><div class="ship" id="ship-'+ship.id+'">';
+			shipDisplay += '<div class="shipName">'+ship.trueModelName;
+			if (ship.variantName) {
+				shipDisplay += ' ('+ship.variantName+')';
+			}
+			shipDisplay += '</div>';
+			if (ship.thumbnailId) {
+				shipDisplay += '<div class="shipThumbnail"><img src="/skyImage/'+ship.thumbnailId+'"></div>';
+			} else {
+				shipDisplay += '<div class="shipThumbnail"><img src="/skyImage/'+ship.spriteId+'"></div>';
+			}
+			
+			shipDisplay += '</div></a>';
+			shipCategory += shipDisplay;
+		}
+		shipCategory += '</div>';
+		$("#shipList").append(shipCategory);
+	}
+});
+</script>
+
+<div id="shipList">Loading ships...</div>
+{% endblock %}

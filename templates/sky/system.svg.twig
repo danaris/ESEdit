@@ -1,0 +1,128 @@
+<style>
+{% for government in skyGovernments() %}
+	{% if government.color is defined and government.color != '' %}
+		{% set govColor = colorToCSS(government.color) %}
+	{% else %}
+		{% set govColor = false %}
+	{% endif %}
+	{% if govColor %}
+.{{ government.name|raw|cssNameEsc }} {
+	background-color: {{ govColor }};
+}
+.{{ government.name|raw|cssNameEsc }}-stroke {
+	stroke: {{ govColor }};
+}
+.{{ government.name|raw|cssNameEsc }}-fill {
+	fill: {{ govColor }};
+}
+	{% endif %}
+{% endfor %}
+</style>
+{% if size is not defined %}
+	{% set size = 2048 %}
+{% endif %}
+{% if frameSize is not defined %}
+	{% set frameSize = size %}
+{% endif %}
+{% set system = systemInfo(systemName) %}
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="{{ frameSize }}" height="{{ frameSize }}" viewBox="0 0 {{ size }} {{ size }}" id="systemSvg">
+<defs>
+	<filter id="planetGlow" height="300%" width="300%" x="-75%" y="-75%">
+		<!-- Thicken out the original shape -->
+		<feMorphology operator="dilate" radius="2" in="SourceAlpha" result="thicken" />
+	
+		<!-- Use a gaussian blur to create the soft blurriness of the glow -->
+		<feGaussianBlur in="thicken" stdDeviation="1.5" result="blurred" />
+	
+		<!-- Change the colour -->
+		<feFlood flood-color="rgba(255,255,255, 0.7)" result="glowColor" />
+	
+		<!-- Color in the glows -->
+		<feComposite in="glowColor" in2="blurred" operator="in" result="softGlow_colored" />
+	
+		<!--	Layer the effects together -->
+		<feMerge>
+			<feMergeNode in="softGlow_colored"/>
+			<feMergeNode in="SourceGraphic"/>
+		</feMerge>
+	
+	</filter>
+</defs>
+<g>
+	{% if system.haze %}
+		{% set hazeImage = imageFor(system.haze) %}
+	<image id="{{ system.name|cssNameEsc }}-haze" xlink:href="{{ path('SkyImagePath', {imagePath: hazeImage['path']}) }}" x="0" y="0"/>
+	{% endif %}
+	{% for index, object in system.objects %}
+		{% set objectImage = imageFor(object.sprite.name) %}
+		{% set objectPosition = esToSvg(stellarObjectPosition(system, object, startDay), size) %}
+		{% if object.planet %}
+			{% set objectLabelInfo = createLabel(system, object, startDay, size) %}
+	<g id="{{ object.planet.name|cssNameEsc }}-label">
+		<path d="{{ objectLabelInfo['innerArc'] }}" fill-opacity="0" stroke-width="8" class="{{ object.planet.government.name|cssNameEsc }}-stroke" />
+		<path d="{{ objectLabelInfo['outerArc'] }}" fill-opacity="0" stroke-width="4" class="{{ object.planet.government.name|cssNameEsc }}-stroke" />
+		<line x1="{{ objectLabelInfo['lineStart'].x }}" y1="{{ objectLabelInfo['lineStart'].y }}" x2="{{ objectLabelInfo['lineEnd'].x }}" y2="{{ objectLabelInfo['lineEnd'].y }}" stroke-width="3" class="{{ object.planet.government.name|cssNameEsc }}-stroke" />
+		<text x="{{ objectLabelInfo['textStart'].x }}" y="{{ objectLabelInfo['textStart'].y }}" style="font-size: 40px;" class="{{ object.planet.government.name|cssNameEsc }}-fill">{{ object.planet.name }} ({{ object.planet.government.name }})</text>
+	</g>
+		{% endif %}
+			
+		<image id="{{ system.name|cssNameEsc }}-object-{{ index }}" xlink:href="{{ path('SkyImagePath', {imagePath: objectImage['path']}) }}" x="{{ objectPosition.x - (objectImage['width']/2) }}" y="{{ objectPosition.y - (objectImage['height']/2) }}"{% if object.planet %} style="cursor: pointer;" filter="url(#planetGlow)" onclick="planetInfo('{{ object.planet.trueName }}');"{% endif %} />
+	{% endfor %}
+	
+</g>
+</svg>
+
+<div id="planetDialog" title="Planet" style="display: none;">
+	<div id="planetInfo">
+		<p>Name: <span id="planetName"></span></p>
+		<p>Government: <span id="planetGovernment"></span></p>
+	</div>
+	<div id="planetDesc">
+		
+	</div>
+</div>
+
+<style>
+#planetDialog {
+	background-color: black;
+	color: white;
+}
+</style>
+<script>
+function cssName(origString) {
+	return origString.replace(/\(\)/, '_').replace(/ '/, '-');
+}
+function planetInfo(planetName) {
+	$.ajax({
+		type: "POST",
+		url: '{{ path('SkyPlanetInfo') }}',
+		data: {planetName: planetName},
+		success: function (data) {
+			if (data.error) {
+				// TODO: errors
+			} else {
+				var planet = data.planet;
+				$("#planetDialog").attr('title',planet.name);
+				$("#planetDialog").dialog( "option", "classes.ui-dialog", cssName(planet.government.name) );
+				$("#planetName").text(planet.name);
+				$("#planetGovernment").text(planet.government.name);
+				$("#planetDesc").text(planet.description);
+				
+				$("#planetDialog").dialog("open");
+			}
+		},
+		dataType: 'json'
+	});
+}
+$(function() {
+	$("#planetDialog").dialog({
+	  autoOpen: false,
+	  height: 600,
+	  width: 550,
+	  modal: true,
+	  close: function() {
+		  $("#systemDialog").dialog('close');
+	  }
+	});
+});
+</script>

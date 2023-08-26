@@ -1,0 +1,735 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}{{ Ship.trueModelName }} ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<style>
+#shipTopBar {
+	display: grid;
+	grid-template-columns: auto 5em;
+}
+#shipBasicInfoOuter {
+	padding: 2em;
+}
+#shipBasicInfo {
+	display: grid;
+	grid-template-columns: 10em auto;
+}
+#shipContainer {
+	display: flex;
+	flex-wrap: wrap;
+}
+#shipSprite {
+	text-align: center;
+	padding: 1em;
+}
+#shipSprite svg {
+	padding: 1em;
+}
+#attributes {
+	display: grid;
+	grid-template-columns: 10em auto;
+}
+.propertyName {
+	text-align: left;
+	color: rgb(143,143,143);
+}
+.propertyVal {
+	text-align: right;
+}
+#outfitsOuter {
+	padding: 1em;
+	white-space: nowrap;
+}
+#outfits {
+	display: grid;
+	grid-template-columns: auto 8em;
+}
+#outfits div {
+	padding: 0.1em 0.5em;
+}
+.outfitCount {
+	display: inline-block;
+	width: 2.5em;
+	text-align: right;
+	padding: 0 0.2em;
+}
+#hardpointsOuter {
+	padding: 1em;
+}
+#attributesOuter {
+	padding: 1em;
+}
+.breakAfter {
+	margin-bottom: 1.5em;
+}
+.breakBefore {
+	margin-top: 1.5em;
+}
+.reverseMovement {
+	display: none;
+}
+#newOutfitContainer {
+	display: grid;
+	grid-template-columns: 6em auto 3em;
+}
+#newOutfit {
+	padding-right: 0.25em;
+}
+#shipSpecDialog {
+	white-space: pre-wrap;
+	font-family: monospace;
+	background-color: rgb(100,100,100);
+	color: rgb(220,220,220);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<script src="{{ path("SkySpritesJS") }}"></script>
+<script src="{{ path("SkyOutfitsJS") }}"></script>
+<script src="{{ path("SkyShipsJS") }}"></script>
+<script>
+function mergeMaps(thisMap, otherMap, count) {
+	for (var otherName in otherMap) {
+		var otherData = otherMap[otherName];
+		if (thisMap[otherName] == undefined) {
+			thisMap[otherName] = {'val': otherData['val'], 'count': otherData['count'] * count};
+		} else {
+			thisMap[otherName]['count'] += otherData['count'] * count;
+		}
+	}
+}
+function addFlareSprites(outfitAFlares, addFlare, bCount) {
+	for (var flareIndex in outfitAFlares) {
+		var flareData = outfitAFlares[flareIndex];
+		if (flareData['body'].spriteId == addFlare['body'].spriteId) {
+			outfitAFlares[flareIndex]['count'] += bCount * addFlare['count'];
+			return;
+		}
+	}
+	
+	outfitAFlares.push({'body': addFlare['body'], 'count': addFlare['count'] * bCount});
+}
+function combineOutfits(outfitA, outfitB, bCount) {
+	var tmpMethods = {'fallback': outfitA.fallback, 'get': outfitA.get};
+	outfitA.fallback = null;
+	outfitA.get = null;
+	var effOutfit = structuredClone(outfitA);
+	effOutfit.fallback = outfitA.fallback = tmpMethods.fallback;
+	effOutfit.get = outfitA.get = tmpMethods.get;
+	effOutfit.cost += outfitB.cost * bCount;
+	effOutfit.mass += outfitB.mass * bCount;
+	for (var attrName in outfitB.attributes) {
+		var addVal = outfitB.attributes[attrName] * bCount;
+		if (effOutfit.attributes[attrName] != undefined) {
+			effOutfit.attributes[attrName] += addVal;
+		} else {
+			effOutfit.attributes[attrName] = addVal;
+		}
+	}
+	for (var flareIndex in outfitB.flareSprites) {
+		addFlareSprites(effOutfit.flareSprites, outfitB.flareSprites[flareIndex], bCount);
+	}
+	for (var flareIndex in outfitB.reverseFlareSprites) {
+		addFlareSprites(effOutfit.reverseFlareSprites, outfitB.reverseFlareSprites[flareIndex], bCount);
+	}
+	for (var flareIndex in outfitB.steeringFlareSprites) {
+		addFlareSprites(effOutfit.steeringFlareSprites, outfitB.steeringFlareSprites[flareIndex], bCount);
+	}
+	mergeMaps(outfitA.flareSounds, outfitB.flareSounds, bCount);
+	mergeMaps(outfitA.reverseFlareSounds, outfitB.reverseFlareSounds, bCount);
+	mergeMaps(outfitA.steeringFlareSounds, outfitB.steeringFlareSounds, bCount);
+	mergeMaps(outfitA.afterburnerEffects, outfitB.afterburnerEffects, bCount);
+	mergeMaps(outfitA.jumpEffects, outfitB.jumpEffects, bCount);
+	mergeMaps(outfitA.hyperSounds, outfitB.hyperSounds, bCount);
+	mergeMaps(outfitA.hyperInSounds, outfitB.hyperInSounds, bCount);
+	mergeMaps(outfitA.hyperOutSounds, outfitB.hyperOutSounds, bCount);
+	mergeMaps(outfitA.jumpSounds, outfitB.jumpSounds, bCount);
+	mergeMaps(outfitA.jumpInSounds, outfitB.jumpInSounds, bCount);
+	mergeMaps(outfitA.jumpOutSounds, outfitB.jumpOutSounds, bCount);
+	
+	return effOutfit;
+}
+const MAXIMUM_TEMPERATURE = 100;
+var damageTypes = ['HIT_FORCE', 'SHIELD_DAMAGE', 'HULL_DAMAGE', 'DISABLED_DAMAGE', 'MINABLE_DAMAGE', 'FUEL_DAMAGE', 'HEAT_DAMAGE', 'ENERGY_DAMAGE', 'ION_DAMAGE', 'WEAPON_JAMMING_DAMAGE', 'DISRUPTION_DAMAGE', 'SLOWING_DAMAGE', 'DISCHARGE_DAMAGE', 'CORROSION_DAMAGE', 'LEAK_DAMAGE', 'BURN_DAMAGE', 'RELATIVE_SHIELD_DAMAGE', 'RELATIVE_HULL_DAMAGE', 'RELATIVE_DISABLED_DAMAGE', 'RELATIVE_MINABLE_DAMAGE', 'RELATIVE_FUEL_DAMAGE', 'RELATIVE_HEAT_DAMAGE', 'RELATIVE_ENERGY_DAMAGE'];
+var damageTypeNames = ['hit force', 'shield damage', 'hull damage', 'disabled damage', 'minable damage', 'fuel damage', 'heat damage', 'energy damage', 'ion damage', 'weapon jamming damage', 'disruption damage', 'slowing damage', 'discharge damage', 'corrosion damage', 'leak damage', 'burn damage', 'relative shield damage', 'relative hull damage', 'relative disabled damage', 'relative minable damage', 'relative fuel damage', 'relative heat damage', 'relative energy damage'];
+var baseAttributes = ['shields','hull','cost','mass','cargo space','fuel capacity','drag','required crew','bunks','outfit space','weapon capacity','engine capacity','sprite','hardpointSprite','soundId','iconId','isWeapon','isStreamed','isSafe','isPhasing','isDamageScaled','isGravitational','isParallel','lifetime','randomLifetime','reload','burstReload','burstCount','homing','missileStrength','antiMissile','velocity','randomVelocity','acceleration','drag','hardpointOffset','turn','inaccuracy','turretTurn','tracking','opticalTracking','infraredTracking','radarTracking','firingEnergy','firingForce','firingFuel','firingHeat','firingHull','firingShields','firingIon','firingScramble','firingSlowing','firingDisruption','firingDischarge','firingCorrosion','firingLeak','firingBurn','relativeFiringEnergy','relativeFiringHeat','relativeFiringFuel','relativeFiringHull','relativeFiringShields','splitRange','triggerRadius','blastRadius','safeRange','piercing','rangeOverride','velocityOverride','hasDamageDropoff','damageDropoffModifier','calculatedDamage','doesDamage','totalLifetime','damageDropoffRange','damage','ammo','pluralName','Utility','index','description','flareSprites','reverseFlareSprites','reverseFlareSounds','jumpEffects','hyperSounds','hyperOutSounds','jumpInSounds','outfit space','weapon capacity','trueName','displayName','category','series','thumbnailId','flotsamSprite','attributes','steeringFlareSprites','flareSounds','steeringFlareSounds','afterburnerEffects','hyperInSounds','jumpSounds','jumpOutSounds','heat dissipation','gun ports','turret mounts','energy generation','heat generation','energy capacity','shield generation','shield energy','thrust','thrusting energy','turning energy','turning heat','reverse thrust','reverse thrusting energy','reverse thrusting heat','thrusting heat','cooling','hull repair rate','hull energy','cooling energy','afterburner thrust','afterburner energy','afterburner heat','unplunderable','hull heat'];
+var mainShip = ships[{{ Ship.id }}];
+var curShip = mainShip;
+var mainShipSprite = sprites[mainShip.spriteId];
+var curShipSprite = sprites[curShip.spriteId];
+var curAttributesOutfit = null;
+var variants = {};
+function addNewOutfit() {
+	var outfitName = $("#newOutfit").val();
+	if (outfits[outfitName] != undefined) {
+		curShip.outfits[outfitName] = 1;
+	}
+	updateShip(true);
+}
+function findOutfit(request, response) {
+	var foundOutfits = [];
+	for (var outfitName in outfits) {
+		if (outfitName.includes(request.term)) {
+			foundOutfits.push(outfits[outfitName]);
+		}
+	}
+	console.log("Found "+foundOutfits.length+" outfit(s) for term '"+request.term+"'");
+	response(foundOutfits);
+}
+$(function() {
+	$( "#newOutfit" ).autocomplete({
+	  minLength: 0,
+	  source: findOutfit,
+	  focus: function( event, ui ) {
+		$( "#newOutfit" ).val( ui.item.trueName );
+		return false;
+	  },
+	  select: function( event, ui ) {
+		$( "#newOutfit" ).val( ui.item.trueName );
+		$( "#newOutfit-name" ).val( ui.item.trueName );
+		 
+		return false;
+	  }
+	})
+	.autocomplete( "instance" )._renderItem = function( ul, item ) {
+	  return $( '<li class="listItem">' )
+		.append( '<div>' + item.trueName + "<br>" + (item.get("outfit space")*-1) + " tons</div>" )
+		.appendTo( ul );
+	};
+	var variantSelect = '<select name="variants" onchange="selectVariant();"><option>' + mainShip.trueModelName + '</option>';
+	var variantCount = 0;
+	variants[mainShip.trueModelName] = mainShip;
+	for (var shipId in ships) {
+		var ship = ships[shipId];
+		if (ship.trueModelName == mainShip.trueModelName && ship.variantName != '') {
+			variants[ship.variantName] = ship;
+			variantSelect += '<option>' + ship.variantName + '</option>';
+			variantCount++;
+		}
+	}
+	variantSelect += '</select>';
+	if (variantCount > 0) {
+		$("#variantContainer").html(variantSelect);
+	}
+	updateShip(curShip.addAttributes);
+});
+function selectVariant() {
+	var variantName = $("select[name=variants]").val();
+	var variantShip = variants[variantName];
+	if (variantShip != undefined) {
+		curShip = variantShip;
+	}
+	updateShip(curShip.addAttributes);
+	if (variantShip.sprite != undefined && variantShip.sprite != null) {
+		updateSprite(variantShip);
+	} else {
+		updateSprite(mainShip);
+	}
+}
+function increaseOutfit(outfitName) {
+	curShip.outfits[outfitName]++;
+	updateShip(true);
+}
+function reduceOutfit(outfitName) {
+	curShip.outfits[outfitName]--;
+	updateShip(true);
+}
+function removeOutfit(outfitName) {
+	delete curShip.outfits[outfitName];
+	updateShip(true);
+}
+function updateShip(recalcAttrs=false) {
+	var shipName = curShip.trueModelName;
+	if (curShip.variantName) {
+		shipName = curShip.variantName;
+	}
+	$("#modelName").text(shipName);
+	var attributesOutfit;
+	attributesOutfit = curShip.attributesOutfit;
+	if (curShip.baseAttributesOutfit != undefined) {
+		curAttributesOutfit = curShip.baseAttributesOutfit;
+		attributesOutfit.fallback = curAttributesOutfit;
+	} else {
+		curAttributesOutfit = attributesOutfit;
+	}
+	$("#outfits").html('');
+	var curOutfits = curShip.outfits;
+	if (curOutfits.length == 0) {
+		curOutfits = mainShip.outfits;
+	}
+	if (recalcAttrs) {
+		//curOutfits = mainShip.outfits;
+		var tmpMethods = {'fallback': curShip.baseAttributesOutfit.fallback, 'get': curShip.baseAttributesOutfit.get};
+		curShip.baseAttributesOutfit.fallback = null;
+		curShip.baseAttributesOutfit.get = null;
+		attributesOutfit = structuredClone(curShip.baseAttributesOutfit);
+		attributesOutfit.fallback = curShip.baseAttributesOutfit.fallback = tmpMethods.fallback;
+		attributesOutfit.get = curShip.baseAttributesOutfit.get = tmpMethods.get;
+	}
+	for (var outfitName in curOutfits) {
+		if (outfitName == 'length') {
+			continue;
+		}
+		var outfit = outfits[outfitName];
+		var count = curOutfits[outfitName];
+		if (recalcAttrs) {
+			attributesOutfit = combineOutfits(attributesOutfit, outfit, count);
+		}
+		var outfitStr = '<div id="outfitName-'+nameEsc(outfitName)+'">'+outfitName+'</div>';
+		outfitStr += '<div id="outfitControls-'+nameEsc(outfitName)+'"><button type="button" onclick="reduceOutfit(\''+outfitName+'\');">-</button>';
+		outfitStr += '<span class="outfitCount" id="outfitCount-'+nameEsc(outfitName)+'">'+count+'</span>';
+		outfitStr += '<button type="button" onclick="increaseOutfit(\''+outfitName+'\');">+</button> ';
+		outfitStr += '<button type="button" onclick="removeOutfit(\''+outfitName+'\');">x</button></div>';
+		$("#outfits").append(outfitStr);
+	}
+	curAttributesOutfit.attributes['gun ports'] = 0;
+	curAttributesOutfit.attributes['turret mounts'] = 0;
+	$("#hardpointTable tbody").html('');
+	for (var hpIndex in curShip.hardpoints) {
+		var hardpoint = curShip.hardpoints[hpIndex];
+		var hardpointSVG = '';
+		var hardpointSpriteId = null;
+		var hardpointX = (curShipSprite.width / 2 + hardpoint.point.x);
+		var hardpointY = (curShipSprite.height / 2 + hardpoint.point.y);
+		if (hardpoint.equippedOutfit) {
+			var hardpointOutfit = outfits[hardpoint.equippedOutfit];
+			hardpointX += hardpointOutfit.hardpointOffset.x;
+			hardpointY += hardpointOutfit.hardpointOffset.y;
+			if (hardpointOutfit.hardpointSprite && hardpointOutfit.hardpointSprite.spriteId) {
+				hardpointSpriteId = hardpointOutfit.hardpointSprite.spriteId;
+			}
+		}
+		if (hardpointSpriteId) {
+			var hardpointSprite = sprites[hardpointSpriteId];
+			var hardpointSource = '/skyImage/'+hardpointSpriteId;
+			var hardpointImage = new Image();
+			hardpointImage.src = hardpointSource;
+			var img = document.createElementNS('http://www.w3.org/2000/svg','image');
+			img.setAttributeNS(null,'class','swizzleReady hardpointImage');
+			img.setAttributeNS(null,'height',hardpointSprite.width);
+			img.setAttributeNS(null,'width',hardpointSprite.height);
+			img.setAttributeNS(null,'id','hardpoint-'+hpIndex);
+			img.setAttributeNS('http://www.w3.org/1999/xlink','href',hardpointSource);
+			img.setAttributeNS(null,'x',hardpointX);
+			img.setAttributeNS(null,'y',hardpointY);
+			hardpointSVG = img;
+			//hardpointSVG = '<image class="swizzleReady hardpointImage" xlink:href="'+hardpointSource+'" x="'++'" y="'++'" filter="url(#swizzle0)"></image>';
+		} else {
+			hardpointSVG = '<circle id="hardpoint-'+hpIndex+'" class="hardpointPlaceholder" r="5" stroke-width="3" cx="'+hardpointX+'" cy="'+hardpointY+'" stroke="red" />';
+		}
+		var hardpointHighlight = '<circle id="hardpointHighlight-'+hpIndex+'" r="5" stroke-width="3" cx="'+hardpointX+'" cy="'+hardpointY+'" stroke="rgba(255,255,255,0.5)" style="display: none;" />';
+		$("#hardpointHighlights").append(hardpointHighlight);
+		if (hardpoint.isUnder) {
+			$("#hardpointsUnder").append(hardpointSVG);
+		} else {
+			$("#hardpointsOver").append(hardpointSVG);
+		}
+		$("#swizzleSvg-"+mainShip.id).html($("#swizzleSvg-"+mainShip.id).html());
+		
+		var hardpointType = 'gun';
+		if (hardpoint.isTurret) {
+			hardpointType = 'turret';
+			curAttributesOutfit.attributes['turret mounts']++;
+		} else {
+			curAttributesOutfit.attributes['gun ports']++;
+		}
+		
+		var hardpointDesc = '<td>' + hardpointType + '</td><td style="white-space: nowrap;">' + hardpoint.point.x + ' ' + hardpoint.point.y + '</td><td style="white-space: nowrap;">';
+		if (hardpoint.equippedOutfit) {
+			hardpointDesc += '"' + hardpoint.equippedOutfit + '"';
+		}
+		hardpointDesc += '</td><td>';
+		if (hardpoint.isUnder) {
+			hardpointDesc += 'under';
+		}
+		hardpointDesc += '</td>';
+		$("#hardpointTable tbody").append('<tr onmouseover="highlightHardpoint('+hpIndex+');" onmouseout="unhighlightHardpoint('+hpIndex+');">' + hardpointDesc + '</tr>');
+	}
+	curShip.attributesOutfit = attributesOutfit;
+	$("#attributes").text('');
+	for (var attrName in attributesOutfit.attributes) {
+		if (baseAttributes.includes(attrName)) {
+			if (curShip[attrName] == undefined) {
+				curShip[attrName] = 0;
+			}
+			curShip[attrName] += attributesOutfit[attrName];
+			continue;
+		}
+		$("#attributes").append('<div class="propertyName">'+attrName+'</div><div class="propertyVal">'+formatNumber(attributesOutfit.get(attrName))+'</div>');
+	}
+	$("#cost").text(formatNumber(attributesOutfit.cost) + ' credits');
+	$("#mass").text(formatNumber(attributesOutfit.mass) + ' tons');
+	$("#cargo").text(formatNumber(attributesOutfit.get('cargo space')) + ' tons');
+	var hasShieldRegen = false;
+	var hasHullRepair = false;
+	var shieldsInfo = formatNumber(attributesOutfit.get('shields'));
+	if (attributesOutfit.get('shield generation') && attributesOutfit.get('shield generation') != 0) {
+		var shieldGen = formatNumber(attributesOutfit.get('shield generation') * 60);
+		shieldsInfo += ' (regen ' + shieldGen + '/s)';
+		hasShieldRegen = true;
+	}
+	$("#shields").text(shieldsInfo);
+	var hullInfo = formatNumber(attributesOutfit.get('hull'));
+	if (attributesOutfit.get('hull repair rate') && attributesOutfit.get('hull repair rate') != 0) {
+		var hullRepair = formatNumber(attributesOutfit.get('hull repair rate') * 60);
+		hullInfo += ' (repair ' + hullRepair + '/s)';
+		hasHullRepair = true;
+	}
+	$("#hull").text(hullInfo);
+	$("#fuel").text(formatNumber(attributesOutfit.get('fuel capacity')));
+	
+	var forwardThrust = attributesOutfit.get('thrust');
+	if (!forwardThrust) {
+		forwardThrust = attributesOutfit.get('afterburner thrust');
+	}
+	var dragReduction = 0;
+	if (attributesOutfit.get('drag reduction') != undefined) {
+		dragReduction = attributesOutfit.get('drag reduction');
+	}
+	var inertiaReduction = 0;
+	if (attributesOutfit.get('inertia reduction') != undefined) {
+		inertiaReduction = attributesOutfit.get('inertia reduction');
+	}
+	var drag = attributesOutfit.get('drag') / (1 + dragReduction);
+	var maxSpeed = formatNumber(60 * forwardThrust / drag);
+	var currentMass = attributesOutfit.mass / (1 + inertiaReduction);
+	var acceleration = formatNumber(3600 * forwardThrust / currentMass);
+	var turnRate = formatNumber(60 * attributesOutfit.get('turn') / currentMass);
+	$("#thrust").text(formatNumber(attributesOutfit.get('thrust')));
+	$("#turn").text(formatNumber(attributesOutfit.get('turn')));
+	$("#maxSpeed").text(maxSpeed);
+	$("#accel").text(acceleration);
+	$("#turnRate").text(turnRate);
+	var timeToMaxSpeed = maxSpeed / acceleration;
+	$("#timeToMaxSpeed").text(formatNumber(timeToMaxSpeed) + 's');
+	if (attributesOutfit.get('reverse thrust') != undefined) {
+		var reverseThrust = attributesOutfit.get('reverse thrust');
+		var revMaxSpeed = formatNumber(60 * reverseThrust / drag);
+		var revAcceleration = formatNumber(3600 * reverseThrust / currentMass);
+		$("#revThrust").text(formatNumber(reverseThrust));
+		$("#revMaxSpeed").text(revMaxSpeed);
+		$("#revAccel").text(revAcceleration);
+		$(".reverseMovement").show();
+	}
+	var baseOutfitSpace = curAttributesOutfit.get('outfit space');
+	var baseWeaponSpace = curAttributesOutfit.get('weapon capacity');
+	var baseEngineSpace = curAttributesOutfit.get('engine capacity');
+	var curOutfitSpace = attributesOutfit.get('outfit space');
+	var curWeaponSpace = attributesOutfit.get('weapon capacity');
+	var curEngineSpace = attributesOutfit.get('engine capacity');
+	$("#outfitSpace").text(formatNumber(curOutfitSpace) + ' / ' + formatNumber(baseOutfitSpace));
+	$("#weaponSpace").text(formatNumber(curWeaponSpace) + ' / ' + formatNumber(baseWeaponSpace));
+	$("#engineSpace").text(formatNumber(curEngineSpace) + ' / ' + formatNumber(baseEngineSpace));
+	var baseGunPorts = curAttributesOutfit.get('gun ports');
+	var curGunPorts = curShip.attributesOutfit.get('gun ports');
+	var baseTurretMounts = curAttributesOutfit.get('turret mounts');
+	var curTurretMounts = curShip.attributesOutfit.get('turret mounts');
+	$("#gunPorts").text(formatNumber(curGunPorts) + ' / ' + formatNumber(baseGunPorts));
+	$("#turretMounts").text(formatNumber(curTurretMounts) + ' / ' + formatNumber(baseTurretMounts));
+	
+	var idleEnergyPerFrame = attributesOutfit.get('energy generation') + attributesOutfit.get('solar collection') + attributesOutfit.get('fuel energy') - attributesOutfit.get('energy consumption') - attributesOutfit.get('cooling energy');
+	var idleHeatPerFrame = attributesOutfit.get('heat generation') + attributesOutfit.get('solar heat') + attributesOutfit.get('fuel heat') - coolingEfficiency() * (attributesOutfit.get('cooling') + attributesOutfit.get('active cooling'));
+	$("#idleEnergy").text(formatNumber(60 * idleEnergyPerFrame));
+	$("#idleHeat").text(formatNumber(60 * idleHeatPerFrame));
+	
+	var movingEnergyPerFrame = Math.max(attributesOutfit.get('thrusting energy'), attributesOutfit.get('reverse thrusting energy')) + attributesOutfit.get('turning energy') + attributesOutfit.get('afterburner energy');
+	var movingHeatPerFrame = Math.max(attributesOutfit.get('thrusting heat'), attributesOutfit.get('reverse thrusting heat')) + attributesOutfit.get('turning heat') + attributesOutfit.get('afterburner heat');
+	$("#movingEnergy").text(formatNumber(-60 * movingEnergyPerFrame));
+	$("#movingHeat").text(formatNumber(60 * movingHeatPerFrame));
+	
+	var damage = {};
+	var firingEnergy = 0;
+	var firingHeat = 0;
+	for (var outfitName in curShip.outfits) {
+		if (outfitName == 'length') {
+			continue;
+		}
+		var outfitCount = curShip.outfits[outfitName];
+		var outfit = outfits[outfitName];
+		if (outfit.isWeapon && outfit.reload != 0) {
+			firingEnergy += outfitCount * outfit.firingEnergy / outfit.reload;
+			firingHeat += outfitCount * outfit.firingHeat / outfit.reload;
+		}
+		for (var damageTypeId in outfit.damage) {
+			if (damage[damageTypeId] == undefined) {
+				damage[damageTypeId] = 0;
+			}
+			damage[damageTypeId] += outfitCount * outfit.damage[damageTypeId] / outfit.reload;
+		}
+	}
+	
+	$("#firingEnergy").text(formatNumber(-60 * firingEnergy));
+	$("#firingHeat").text(formatNumber(60 * firingHeat));
+	
+	var shieldEnergy = (hasShieldRegen) ? attributesOutfit.get('shield energy') * (1 + attributesOutfit.get('shield energy multiplier')) : 0;
+	var hullEnergy = (hasHullRepair) ? attributesOutfit.get('hull energy') * (1 + attributesOutfit.get('hull energy multiplier')) : 0;
+
+	var shieldHeat = (hasShieldRegen) ? attributesOutfit.get('shield heat') * (1 + attributesOutfit.get('shield heat multiplier')) : 0;
+	var hullHeat = (hasHullRepair) ? attributesOutfit.get('hull heat') * (1 + attributesOutfit.get('hull heat multiplier')) : 0;
+	
+	if (hasShieldRegen) {
+		$("#shieldEnergy").text(formatNumber(-60 * shieldEnergy));
+		$("#shieldHeat").text(formatNumber(60 * shieldHeat));
+		$(".shieldCost").show();
+	} else {
+		$(".shieldCost").hide();
+	}
+	if (hasHullRepair) {
+		$("#hullEnergy").text(formatNumber(-60 * hullEnergy));
+		$("#hullHeat").text(formatNumber(60 * hullHeat));
+		$(".hullCost").show();
+	} else {
+		$(".hullCost").hide();
+	}
+	var maxEnergy = attributesOutfit.get('energy capacity');
+	var maxHeat = 60. * .001 * attributesOutfit.get('heat dissipation') * MAXIMUM_TEMPERATURE * (attributesOutfit.mass + attributesOutfit.get('heat capacity'));
+	$("#maxEnergy").text(formatNumber(maxEnergy));
+	$("#maxHeat").text(formatNumber(maxHeat));
+	
+	for (damageType in damage) {
+		if (damage[damageType] != 0) {
+			var damageInfo = '<div class="propertyName">' + damageTypeNames[damageType] + '</div><div class="propertyVal">' + formatNumber(damage[damageType] * 60) + '</div>';
+			$("#shipBasicInfo").append(damageInfo);
+		}
+	}
+}
+function coolingEfficiency() {
+	var x = curShip.attributesOutfit.get('cooling inefficiency');
+	var efficiency = 2 + (2 / ( 1 + Math.exp(x / -2)) - 4 / (1 + Math.exp(x / -4)));
+	return efficiency;
+}
+function updateSwizzle() {
+	var swizzleIndex = $("select[name=swizzleChanger]").val();
+	$(".swizzleReady").attr('filter','url(#swizzle'+swizzleIndex+')');
+	$("svg").html($("svg").html());
+}
+function unhighlightHardpoint(hardpointId) {
+	// var hardpoint = curShip.hardpoints[hardpointId];
+	// var newFilter = false;
+	// if (hardpoint.equippedOutfit) {
+	// 	var hardpointOutfit = outfits[hardpoint.equippedOutfit];
+	// 	if (hardpointOutfit.hardpointSprite && hardpointOutfit.hardpointSprite.spriteId) {
+	// 		var swizzleIndex = $("select[name=swizzleChanger]").val();
+	// 		newFilter = 'url(#swizzle'+swizzleIndex+')';
+	// 	}
+	// }
+	// if (newFilter) {
+	// 	$("#hardpoint-"+hardpointId).attr('filter',newFilter);
+	// } else {
+	// 	$("#hardpoint-"+hardpointId).removeAttr('filter');
+	// }
+	// $("svg").html($("svg").html());
+	$("#hardpointHighlight-"+hardpointId).hide();
+}
+function highlightHardpoint(hardpointId) {
+	// $("#hardpoint-"+hardpointId).attr('filter','url(#glow)');
+	// $("svg").html($("svg").html());
+	$("#hardpointHighlight-"+hardpointId).show();
+}
+var countDecimals = function(value) {
+  let text = value.toString()
+  // verify if number 0.000005 is represented as "5e-6"
+  if (text.indexOf('e-') > -1) {
+	let [base, trail] = text.split('e-');
+	let deg = parseInt(trail, 10);
+	return deg;
+  }
+  // count decimals for number in representation like "0.123456"
+  if (Math.floor(value) !== value) {
+	return value.toString().split(".")[1].length || 0;
+  }
+  return 0;
+}
+function numberWithCommas(x) {
+	return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function formatNumber(number) {
+	var tempNumber = number;
+	if (countDecimals(number) > 2) {
+		tempNumber = number.toFixed(2);
+	}
+	if (number > 1000) {
+		tempNumber = numberWithCommas(tempNumber);
+	}
+	return tempNumber;
+}
+function writeShip() {
+	if (curShipSprite) {
+		curShip.sprite = curShipSprite;
+	} else {
+		curShip.sprite = null;
+	}
+	if (curShip.thumbnailId) {
+		curShip.thumbnail = sprites[curShip.thumbnailId];
+	} else {
+		curShip.thumbnail = null;
+	}
+	if (curShip.baseShipId) {
+		curShip.baseName = ships[curShip.baseShipId].trueModelName;
+	} else {
+		curShip.baseName = null;
+	}
+	var tmp = {'get': null};
+	if (curShip.attributesOutfit) {
+		curShip.attributesOutfit.thumbnail = null;
+		curShip.attributesOutfit.flotsamSprite = null;
+		tmp.get = curShip.attributesOutfit.get;
+		curShip.attributesOutfit.get = null;
+	}
+	if (curShip.baseAttributesOutfit) {
+		curShip.baseAttributesOutfit.thumbnail = null;
+		curShip.baseAttributesOutfit.flotsamSprite = null;
+		tmp.get = curShip.baseAttributesOutfit;
+		curShip.baseAttributesOutfit.get = null;
+	}
+	var width = Math.round(window.visualViewport.width * 0.75);
+	var height = Math.round(window.visualViewport.height * 0.75);
+	$("#writeShipButton").text('Loading...');
+	$.ajax({
+		type: "POST",
+		url: '{{ path('SkyEditWriteShip') }}',
+		data: {ship: JSON.stringify(curShip)},
+		success: function (data) {
+			$("#writeShipButton").text('Data Spec');
+			if ($("#shipSpecDialog").length == 0) {
+				$("#content").append('<div id="shipSpecDialog" title="Ship Spec"></div>');
+			}
+			$("#shipSpecDialog").html(data);
+			$("#shipSpecDialog").dialog({
+				  autoOpen: false,
+				  height: height,
+				  width: width,
+				  modal: true,
+				  close: function() {
+					  $("#shipSpecDialog").dialog('close');
+				  }
+			  });
+			$("#shipSpecDialog").dialog('open');
+		},
+		dataType: 'text'
+	});
+	if (curShip.attributesOutfit) {
+		curShip.attributesOutfit.get = tmp.get;
+	}
+	if (curShip.baseAttributesOutfit) {
+		curShip.baseAttributesOutfit.get = tmp.get;
+	}
+}
+</script>
+<div id="shipTopBar">
+	<h2>{{ Ship.trueModelName }} <span id="variantContainer"></span></h2>
+	<p><button type="button" id="writeShipButton" onclick="writeShip();">Data Spec</button></p>
+</div>
+<div id="shipContainer">
+	<div id="shipBasicInfoOuter">
+		<div id="shipBasicInfo">
+			<div class="propertyName" id="nameName">Model Name:</div><div class="propertyVal" id="modelName"></div>
+			<div class="propertyName">Cost:</div><div class="propertyVal breakAfter" id="cost">{{ Ship.getAttribute('cost') }}</div>
+			<div class="propertyName">Shields:</div><div class="propertyVal" id="shields">{{ Ship.getAttribute('shields') }}</div>
+			<div class="propertyName">Hull:</div><div class="propertyVal" id="hull">{{ Ship.getAttribute('hull') }}</div>
+			<div class="propertyName">Mass:</div><div class="propertyVal" id="mass">{{ Ship.getAttribute('mass') }} tons</div>
+			<div class="propertyName">Cargo Capacity:</div><div class="propertyVal" id="cargo">{{ Ship.getAttribute('cargo space') }} tons</div>
+			<div class="propertyName">Required/Max Crew:</div><div class="propertyVal" id="crew">{{ Ship.getAttribute('required crew') }}/{{ Ship.getAttribute('bunks') }}</div>
+			<div class="propertyName breakAfter">Fuel:</div><div class="propertyVal" id="fuel">{{ Ship.getAttribute('fuel capacity') }}</div>
+			<div style="grid-column-start: span 2;">Movement:</div>
+			<div class="propertyName">Thrust:</div><div class="propertyVal" id="thrust">{{ Ship.getAttribute('thrust') }}</div>
+			<div class="propertyName">Turn (raw):</div><div class="propertyVal" id="turn">{{ Ship.getAttribute('turn') }}</div>
+			<div class="propertyName">Max speed:</div><div class="propertyVal" id="maxSpeed"></div>
+			<div class="propertyName">Acceleration:</div><div class="propertyVal" id="accel"></div>
+			<div class="propertyName">Time to Max Speed:</div><div class="propertyVal" id="timeToMaxSpeed"></div>
+			<div class="propertyName">Turning:</div><div class="propertyVal" id="turnRate"></div>
+			
+			<div class="reverseMovement" style="grid-column-start: span 2;">Reverse Movement:</div>
+			<div class="reverseMovement propertyName">Reverse Thrust:</div><div class="reverseMovement propertyVal" id="revThrust">{{ Ship.getAttribute('thrust') }}</div>
+			<div class="reverseMovement propertyName">Max reverse speed:</div><div class="reverseMovement propertyVal" id="revMaxSpeed"></div>
+			<div class="reverseMovement propertyName">Reverse acceleration:</div><div class="reverseMovement propertyVal" id="revAccel"></div>
+			
+			<div class="breakBefore propertyName">Outfit space free:</div><div class="breakBefore propertyVal" id="outfitSpace"></div>
+			<div class="propertyName"> &nbsp Weapon space free:</div><div class="propertyVal" id="weaponSpace"></div>
+			<div class="propertyName"> &nbsp Engine space free:</div><div class="propertyVal" id="engineSpace"></div>
+			<div class="propertyName">Gun ports free:</div><div class="propertyVal" id="gunPorts"></div>
+			<div class="propertyName breakAfter">Turret mounts free:</div><div class="propertyVal" id="turretMounts"></div>
+			
+			<table style="grid-column-start: span 2;" class="breakAfter">
+				<tr><td></td><td class="propertyVal">energy</td><td class="propertyVal">heat</td></tr>
+				<tr><td class="propertyName">idle:</td><td class="propertyVal" id="idleEnergy"></td><td class="propertyVal" id="idleHeat"></td></tr>
+				<tr><td class="propertyName">moving:</td><td class="propertyVal" id="movingEnergy"></td><td class="propertyVal" id="movingHeat"></td></tr>
+				<tr><td class="propertyName">firing:</td><td class="propertyVal" id="firingEnergy"></td><td class="propertyVal" id="firingHeat"></td></tr>
+				<tr class="shieldCost"><td class="propertyName">charging shields:</td><td class="propertyVal" id="shieldEnergy"></td><td class="propertyVal" id="shieldHeat"></td></tr>
+				<tr class="hullCost"><td class="propertyName">repairing hull:</td><td class="propertyVal" id="repairEnergy"></td><td class="propertyVal" id="repairHeat"></td></tr>
+				<tr><td class="propertyName">max:</td><td class="propertyVal" id="maxEnergy"></td><td class="propertyVal" id="maxHeat"></td></tr>
+			</table>
+			
+			
+		</div>
+	</div>
+	<div id="shipSprite">
+		{% if Ship.sprite %}
+		<select name="swizzleChanger" onchange="updateSwizzle();">
+			<option value="0">red + yellow markings (republic)</option>
+			<option value="1">red + magenta markings</option>
+			<option value="2">green + yellow (free worlds)</option>
+			<option value="3">green + cyan</option>
+			<option value="4">blue + magenta (syndicate)</option>
+			<option value="5">blue + cyan (merchant)</option>
+			<option value="6">red and black (pirate)</option>
+			<option value="7">pure red</option>
+			<option value="8">faded red</option>
+			<option value="9">pure black</option>
+			<option value="10">faded black</option>
+			<option value="11">pure white</option>
+			<option value="12">darkened blue</option>
+			<option value="13">pure blue</option>
+			<option value="14">faded blue</option>
+			<option value="15">darkened cyan</option>
+			<option value="16">pure cyan</option>
+			<option value="17">faded cyan</option>
+			<option value="18">darkened green</option>
+			<option value="19">pure green</option>
+			<option value="20">faded green</option>
+			<option value="21">darkened yellow</option>
+			<option value="22">pure yellow</option>
+			<option value="23">faded yellow</option>
+			<option value="24">darkened magenta</option>
+			<option value="25">pure magenta</option>
+			<option value="26">faded magenta</option>
+			<option value="27">red only (cloaked)</option>
+			<option value="28">black only (outline)</option>
+		</select><br>
+			{% set Sprite = Ship.sprite %}
+			{% set displayWidth = Sprite.width %}
+			{% set displayHeight = Sprite.height %}
+			{% include 'sky/shipSprite.svg.twig' %}
+		{% else %}
+		<p>(No ship sprite)</p>
+		{% endif %}
+	</div>
+	<div id="outfitsOuter">
+		<h3>Outfits:</h3>
+		<div id="outfits"></div>
+		<div id="newOutfitContainer">
+			<label id="newOutfit-label" for="newOutfit">Add Outfit:</label>
+			<input id="newOutfit" name="newOutfit">
+			<input type="hidden" id="newOutfit-name">
+			<button type="button" id="addOutfitButton" onclick="addNewOutfit();">Add</button>
+		</div>
+	</div>
+	<div id="hardpointsOuter">
+		<h3>Hardpoints:</h3>
+		<div id="hardpoints">
+			<table id="hardpointTable">
+				<thead>
+					<tr><th>Type</th><th>Position</th><th>Outfit</th><th>Misc</th></tr>
+				</thead>
+				<tbody>
+				</tbody>
+			</table>
+		</div>
+	</div>
+	<div id="attributesOuter">
+		<h3>Attributes:</h3>
+		<div id="attributes"></div>
+	</div>
+</div>
+{% endblock %}

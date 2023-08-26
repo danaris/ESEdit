@@ -1,0 +1,25 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}System {{ systemName }}{% endblock %}
+{% block stylesheets %}
+<style>
+#systemMap {
+	width: 95%;
+	margin-left: 2.5%;
+	margin-right: 2.5%;
+	overflow: scroll;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="systemInfo">
+	<p>{{ systemName }}</p>
+</div>
+<div id="systemMap">
+{% set frameSize = 1280 %}
+{% set size = 4096 %}
+{% include 'sky/system.svg.twig' %}
+</div>
+
+{% endblock %}

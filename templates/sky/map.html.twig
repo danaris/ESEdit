@@ -1,0 +1,267 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Galaxy ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ path("SkyGovColorsCSS") }}"/>
+<style>
+.system {
+	cursor: pointer;
+}
+.Uninhabited-system.unoccupied {
+	fill: black;
+	stroke: rgb(102,102,102);
+}
+.systemName {
+	fill-opacity: 0.7;
+	fill: white;
+	cursor: pointer;
+	font-family: sans-serif;
+}
+.systemName.hidden {
+	fill-opacity: 0.4;
+}
+.systemName:hover {
+	fill-opacity: 1.0;
+}
+.systemName.hidden:hover {
+	fill-opacity: 0.7;
+}
+#systemDialog {
+	display: none;
+}
+.systemChildObjects {
+	margin-left: 2em;
+}
+.system-link {
+	stroke-width: 1px;
+	stroke: lightgray;
+	stroke-opacity: 0.7;
+}
+</style>{% endblock %}
+
+{% block content %}
+<script src="{{ path("SkyColorsJS") }}"></script>
+<script src="{{ path("SkySpritesJS") }}"></script>
+<script src="{{ path("SkyGovernmentsJS") }}"></script>
+<script src="{{ path("SkySystemsJS") }}"></script>
+<script src="{{ path("SkyPlanetsJS") }}"></script>
+<script src="{{ path("SkyGalaxiesJS") }}"></script>
+<script src="{{ path("SkyWormholesJS") }}"></script>
+<script>
+function cssColor(color) {
+	if (typeof color !== 'object') {
+		if (colors[color] != undefined) {
+			color = colors[color];
+		} else {
+			return 'rgb(0,0,0)';
+		}
+	}
+	
+	return 'rgba('+Math.round(color.red * 255)+', '+Math.round(color.green * 255)+', '+Math.round(color.blue * 255)+', ' + Math.round(color.alpha * 255)+')';
+}
+function angleBetween(fromPoint, toPoint) {
+	
+	var rise = toPoint.y - fromPoint.y;
+	var run = toPoint.x - fromPoint.x;
+	if (run == 0) {
+		if (rise > 0) {
+			return 90;
+		} else {
+			return 270;
+		}
+	}
+	
+	var slope = rise / run;
+	
+	var angle = Math.atan(slope);
+	
+	var angleDeg = angle * (180/Math.PI);
+	if (rise < 0 && run > 0) {
+		angleDeg += 360;
+	} else if (rise < 0 || run < 0) {
+		angleDeg += 180;
+	}
+	
+	return angleDeg;
+}
+$(function() {
+	for (var systemName in systems) {
+		var system = systems[systemName];
+		var sysStatus = 'unoccupied';
+		if (system.government != 'Uninhabited' && system.inhabited) {
+			sysStatus = 'occupied';
+		}
+		var systemSVG = '<use id="'+nameEsc(systemName)+'-system"';
+		if (system.hidden) {
+			systemSVG += ' stroke-opacity="0.5"';
+		}
+		systemSVG += ' class="system '+nameEsc(system.government)+'-system '+sysStatus+'" x="'+(2048 + system.position.x)+'" y="'+(2048 + system.position.y)+'" onclick="showSystem(\''+nameEsc(systemName)+'\');" href="#system"><title>'+system.name+'</title></use>';
+		
+		var nameLen = systemName.length;
+		var xOffset = 0;
+		var yOffset = 18;
+		var systemNameSVG = '<text id="'+nameEsc(systemName)+'-systemName" text-anchor="middle" class="systemName';
+		if (system.hidden) {
+			systemNameSVG += ' hidden';
+		}
+		systemNameSVG += '" x="'+(2048 + system.position.x - xOffset)+'" y="'+(2048 + system.position.y + yOffset)+'" onclick="showSystem(\''+nameEsc(systemName)+'\');">'+systemName+'</text>';
+		
+		var systemLinksSVG = '';
+		for (var i in system.links) {
+			var toName = system.links[i];
+			var linkId = nameEsc(systemName)+'-'+nameEsc(toName);
+			if ($("#"+linkId).length > 0) {
+				continue;
+			}
+			var toSystem = systems[toName];
+			if (systemLinksSVG != '') {
+				systemLinksSVG += '\n';
+			}
+			systemLinksSVG += '<line class="system-link" id="'+linkId+'-link" x1="'+(2048 + system.position.x)+'" y1="'+(2048 + system.position.y)+'" x2="'+(2048 + toSystem.position.x)+'" y2="'+(2048 + toSystem.position.y)+'"></line>';
+		}
+		
+		$("#systems").append(systemSVG);
+		$("#systemNames").append(systemNameSVG);
+		$("#systemLinks").append(systemLinksSVG);
+	}
+	for (var wormholeName in wormholes) {
+		var wormhole = wormholes[wormholeName];
+		
+		for (var fromName in wormhole.links) {
+			var fromSystem = systems[fromName];
+			var inactiveFrom = (fromSystem.hidden || fromSystem.inaccessible);
+			
+			var toName = wormhole.links[fromName];
+			var toSystem = systems[toName];
+			
+			var inactiveTo = (toSystem.hidden || toSystem.inaccessible);
+			
+			var wormholeColor = colors['map wormhole'];
+			if (wormhole.linkColor) {
+				wormholeColor = wormhole.linkColor;
+			}
+			wormholeColor = cssColor(wormholeColor);
+			
+			var angle = angleBetween(fromSystem.position, toSystem.position);
+			
+			var wormholeSVG = '<line class="wormhole" id="'+nameEsc(fromName)+'-'+nameEsc(toName)+'-hole" x1="'+(2048 + fromSystem.position.x)+'" y1="'+(2048 + fromSystem.position.y)+'" x2="'+(2048 + toSystem.position.x)+'" y2="'+(2048 + toSystem.position.y)+'" stroke="'+wormholeColor+'" ';
+			if (inactiveFrom || inactiveTo) {
+				wormholeSVG += 'stroke-opacity="0.3"';
+			} else {
+				wormholeSVG += 'stroke-opacity="0.7"';
+			}
+			wormholeSVG += ' style="stroke-width: 2px;"></line>';
+			
+			wormholeSVG += '<use class="wormhole" x="'+(2048 + fromSystem.position.x)+'" y="'+(2048 + fromSystem.position.y)+'" href="#revArrow" stroke-width="2" stroke="'+wormholeColor+'" transform="rotate('+angle+' '+(2048 + fromSystem.position.x)+' '+(2048 + fromSystem.position.y)+')" />';
+			
+			$("#wormholes").append(wormholeSVG);
+		}
+	}
+	
+	// for (var galaxyName in galaxies) {
+	// 	var galaxy = galaxies[galaxyName];
+	// 	var sprite = sprites[galaxy.spriteId];
+	// 	if (sprite == undefined) {
+	// 		console.log('Galaxy '+galaxyName+' with sprite ID '+galaxy.spriteId+' has no defined sprite');
+	// 		continue;
+	// 	}
+	// 	
+	// 	var spritePath = '/skyImage/'+galaxy.spriteId;
+	// 	
+	// 	var preloadSprite = new Image();
+	// 	preloadSprite.src = spritePath;
+	// 	
+	// 	var galaxySVG = '<image id="'+nameEsc(galaxy.name)+'-sprite" xlink:href="'+spritePath+'" x="'+(2048 + galaxy.position.x - (sprite.width/2))+'" y="'+(2048 + galaxy.position.y - (sprite.height/2))+'" />';
+	// 	
+	// 	$("#galaxyMap").append(galaxySVG);
+	// }
+	$("#galaxySvg").html($("#galaxySvg").html());
+});
+</script>
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 4096 4096" id="galaxySvg">
+	<defs>
+		<g id="system">
+			<circle cx="0" cy="0" r="5" stroke-width="3" />
+		</g>
+		<g id="arrow"> 
+			<g> 
+				<path d="M 8,-4 L 0,0 L 8,4 L 8,-4" />
+			</g> 
+		</g>
+		<g id="revArrow"> 
+			<g> 
+				<path d="M 25,-8 L 41,0 L 25,8" fill="none" />
+			</g> 
+		</g>
+	</defs>
+	<g id="galaxyMap">
+		{% for galaxyName, galaxy in galaxies %}
+			<!-- Galaxy sprite: {{ galaxyName }} = {{ galaxy.sprite }} -->
+			{% if galaxy.sprite %}
+				<!-- Galaxy sprite valid -->
+			<image id="{{ galaxy.name }}-sprite" xlink:href="{{ path('SkyImagePath', {spriteId: galaxy.sprite.id}) }}" x="{{ 2048 + galaxy.position.x - (galaxy.sprite.width/2) }}" y="{{ 2048 + galaxy.position.y - (galaxy.sprite.height/2) }}" />
+			{% endif %}
+		{% endfor %}
+	</g>
+	<g id="systemLinks">
+	</g>
+	<g id="wormholes">
+	</g>
+	<g id="systems">
+	</g>
+	<g id="systemNames">
+	</g>
+</svg>
+
+<div id="systemDetails-dialog" class="systemDetails">
+	<div class="sysDetail systemName"></div>
+	<div class="sysDetail systemGovernment"></div>
+	<div class="sysDetail systemAttributes"></div>
+	<div class="sysDetail systemObjects">
+	{# {% for object in system.objects %}
+		<p>System Objects:</p>
+		{% if object.planet %}<div class="sysObjectName">{{ object.planet.name }}</div>{% endif %}
+		<div class="sysDetail sysObjectSprite">Sprite: {{ object.sprite.name }}</div>
+		<div class="sysDetail sysObjectDistance">Distance: {{ object.distance }}</div>
+		<div class="sysDetail sysObjectPeriod">Period: {{ object.speed / 360 }}</div>
+		{% if object.offset %}<div class="sysDetail sysObjectOffset">Offset: {{ object.offset }}</div>{% endif %}
+		{% if object.children|length > 0 %}
+		<div class="sysDetail systemChildObjects">
+			<p>Children:</p>
+			{% for child in object.children %}
+			{% if child.planet %}<div class="sysObjectName">{{ child.planet.name }}</div>{% endif %}
+			<div class="sysDetail sysObjectSprite">Sprite: {{ child.sprite.name }}</div>
+			<div class="sysDetail sysObjectDistance">Distance: {{ child.distance }}</div>
+			<div class="sysDetail sysObjectPeriod">Period: {{ child.speed / 360 }}</div>
+			{% if child.offset %}<div class="sysDetail sysObjectOffset">Offset angle: {{ child.offset }}</div>{% endif %}
+			{% endfor %}
+		</div>
+		{% endif %}
+	{% endfor %} #}
+	</div>
+</div>
+
+<div id="systemDialog" title="System View">
+</div>
+{% endblock %}
+
+{% block lateScripts %}
+<script>
+function showSystem(systemName) {
+	$("#systemDialog").html('');
+	$("#systemDetails-"+systemName).appendTo("#systemDialog");
+	$("#systemDialog").dialog("open");
+}
+$(function() {
+	$("#systemDialog").dialog({
+		  autoOpen: false,
+		  height: 600,
+		  width: 550,
+		  modal: true,
+		  close: function() {
+			  $("#systemDialog").dialog('close');
+		  }
+		});
+});
+</script>
+{% endblock %}

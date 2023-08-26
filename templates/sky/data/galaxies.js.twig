@@ -1,0 +1,4 @@
+var galaxies = {};
+{% for galName, galaxy in galaxies %}
+galaxies["{{galName|raw }}"] = {{ galaxy|json_encode|raw }};
+{% endfor %}

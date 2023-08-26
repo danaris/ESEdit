@@ -1,0 +1,12 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Mission Names ~ Endless Sky Editor{% endblock %}
+
+{% block content %}
+
+<ol>
+{% for mIndex, mission in missions %}
+	<li>{{ mIndex }} - {{ mission.name }}</li>
+{% endfor %}
+</ol>
+{% endblock %}

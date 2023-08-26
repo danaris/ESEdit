@@ -1,0 +1,60 @@
+<div class="missionChain">
+	<div class="missionCard" id="{{ mission.identifier|cssNameEsc }}">
+		<div class="missionNameContainer">{% if not mission.isVisible %}<img src="{{ asset("images/sight-disabled-64.png") }}" style="width: 32px; height: 32px;">{% endif %} <span class="missionName" id="{{ mission.identifier|cssNameEsc }}-name">{{ mission.identifier }}</span>{% if mission.name and mission.name != mission.identifier %} <span class="missionDisplayName">{{ mission.name }}</span>{% endif %}</div>
+		{% if mission.description %}<div class="missionDescription">{{ mission.description }}</div>{% endif %}
+		<div class="missionDebug">
+			<p>Unlocked by: {{ mission.isUnlockedBy|length }}</p>
+			<p>Blocked by: {{ mission.isBlockedBy|length }}</p>
+			<p>Unlocks: {{ mission.unlocksOn|length }}</p>
+			<p>Blocks: {{ mission.blocksOn|length }}</p>
+			<p>Triggers: {{ mission.triggersEventsOn|length }}</p>
+		</div>
+		{% if mission.isUnlockedBy|length > 0 %}
+		<div class="missionPrereqs">
+			Unlocked by:
+			{% for prereqName, prereqInfo in mission.isUnlockedBy %}
+			<p>{% if prereqInfo['type'] == 'mission' %}Mission {{ prereqName }} is {{ prereqInfo['on'] }}
+				{% elseif prereqInfo['type'] == 'event' %}Event {{ prereqName }}{% if prereqInfo['on'] is defined %}{{ prereqInfo['on'] }}{% else %} has occurred{% endif %}
+				{% elseif prereqInfo['type'] == 'attribute' %}Player has attribute {{ prereqName }}{% if prereqInfo['on'] is defined %}{{ prereqInfo['on'] }}{% endif %}
+				{% endif %}</p>
+			{% endfor %}
+		</div>
+		{% endif %}
+		{% if mission.unlocksOn|length > 0 %}
+		<div class="missionUnlocks">
+			Unlocks:
+			{% for unlockName, unlockInfo in mission.unlocksOn %}
+			<p>{% if unlockInfo['type'] == 'mission' %}Mission <span class="missionName">{{ unlockName }}</span> on {{ unlockInfo['on'] }}{% endif %}</p>
+			{% endfor %}
+		</div>
+		{% endif %}
+		{% if mission.triggersEventsOn|length > 0 %}
+		<div class="missionEvents">
+			Triggers:
+			{% for trigger, events in mission.triggersEventsOn %}
+				{% for eventInfo in events %}
+			<p>Event <span class="eventName">{{ eventInfo['name'] }}</span> {% if eventInfo['minDays'] == 0 and eventInfo['maxDays'] == 0 %}on{% elseif eventInfo['maxDays'] != 0 %}up to {{ eventInfo['maxDays'] }} day(s) after{% elseif eventInfo['minDays'] == eventInfo['maxDays'] %}{{ eventInfo['minDays'] }} after{% else %}from {{ eventInfo['minDays'] }} to {{ eventInfo['maxDays'] }} after{% endif %} {{ trigger }}</p>
+				{% endfor %}
+			{% endfor %}
+		</div>
+		{% endif %}
+		
+		<div class="missionDefinitionOuter">
+			<div class="missionDefinitionHeader">[+] Definition</div>
+			<div class="missionDefinition">
+				{{ writeObject(mission)|replace({"\n": "<br>","	": " &nbsp; &nbsp;"})|raw }}
+			</div>
+		</div>
+	</div>
+	<div class="unlockedMissionsOuter">
+		{% if mission.unlocksOn|length > 0 %}
+		<div class="unlockedMissionsHeader">[+] Unlocked Missions</div>
+		<div class="unlockedMissions">
+			{% for unlockName, unlockInfo in mission.unlocksOn %}
+				{% set mission = unlockInfo['mission'] %}
+				{% include 'sky/mission.html.twig' %}
+			{% endfor %}
+		</div>
+		{% endif %}
+	</div>
+</div>

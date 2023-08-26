@@ -4,17 +4,25 @@ namespace App\Service;
 
 use Symfony\Component\Serializer\SerializerInterface;
 use Psr\Log\LoggerInterface;
+use Doctrine\ORM\EntityManagerInterface;
 
-use App\Entity\Sky\Galaxy;
-use App\Entity\Sky\System;
-use App\Entity\Sky\Planet;
-use App\Entity\Sky\Wormhole;
 use App\Entity\Sky\Color;
+use App\Entity\Sky\Condition;
+use App\Entity\Sky\Description;
+use App\Entity\Sky\Galaxy;
+use App\Entity\Sky\GameData;
 use App\Entity\Sky\Government;
-use App\Entity\Sky\Ramscoop;
-use App\Entity\Sky\SystemObject;
-use App\Entity\Sky\Point;
 use App\Entity\Sky\Link;
+use App\Entity\Sky\LocationFilter;
+use App\Entity\Sky\Mission;
+use App\Entity\Sky\Planet;
+use App\Entity\Sky\Point;
+use App\Entity\Sky\Ramscoop;
+use App\Entity\Sky\SpriteSet;
+use App\Entity\Sky\System;
+use App\Entity\Sky\SystemObject;
+use App\Entity\Sky\UniverseObjects;
+use App\Entity\Sky\Wormhole;
 
 class SkyService {
 	
@@ -29,6 +37,7 @@ class SkyService {
 	public array $plugins = array();
 	
 	protected string $dataCachePath = '/var/cache/skyEdit.skyData';
+	protected string $universeCachePath = '/var/cache/skyEditUniverse.skyData';
 	protected string $imageCachePath = '/var/cache/skyEditImages.skyData';
 	protected string $configPath = '/var/cache/skyEdit.config';
 	
@@ -38,10 +47,15 @@ class SkyService {
 	
 	public function __construct(protected LoggerInterface $logger,
 								protected SerializerInterface $serializer,
+								protected EntityManagerInterface $em,
 								$projectDir) {
 		$this->configPath = $projectDir.$this->configPath;
 		$this->dataCachePath = $projectDir.$this->dataCachePath;
+		$this->universeCachePath = $projectDir.$this->universeCachePath;
 		$this->imageCachePath = $projectDir.$this->imageCachePath;
+		
+		$taService = TemplatedArrayService::Instance();
+		$taService->setEntityManager($this->em);
 		
 		$this->data['galaxies'] = array();
 		$this->data['systems'] = array();
@@ -49,6 +63,65 @@ class SkyService {
 		$this->data['wormholes'] = array();
 		$this->data['colors'] = array();
 		$this->data['planets'] = array();
+		
+		$this->data['missions'] = array();
+	}
+	
+	public function truncateTables($tableNames = array(), $cascade = false) {
+		$connection = $this->em->getConnection();
+		$platform = $connection->getDatabasePlatform();
+		$connection->executeQuery('SET FOREIGN_KEY_CHECKS = 0;');
+		foreach ($tableNames as $name) {
+			$connection->executeUpdate($platform->getTruncateTableSQL($name,$cascade));
+		}
+		$connection->executeQuery('SET FOREIGN_KEY_CHECKS = 1;');
+	}
+	
+	public function loadUniverseFromFiles($checkCache = true, $loadImages = true) {
+		// This should be a reliable method to tell if we've at least got something loaded
+		$this->logger->debug('LUFF checking player government');
+		$MyGov = GameData::PlayerGovernment();
+		if ($MyGov->getSwizzle() != 5) {
+			$this->logger->debug('LUFF need to load stuff');
+			$loaded = false;
+			if ($checkCache) {
+				if (file_exists($this->universeCachePath)) {
+					$universeObjects = unserialize(file_get_contents($this->universeCachePath));
+					GameData::SetObjects($universeObjects);
+					$loaded = true;
+				}
+			}
+			$this->truncateTables(['Body', 'Color', 'ConditionSet', 'Conversation', 'ConversationElement', 'ConversationNode', 'Effect', 'EventTrigger', 'Expression', 'FlareSound', 'FlareSprite', 'GameAction', 'GameEvent', 'Government', 'GovernmentPenalty', 'JumpSound', 'LocationFilter', 'Mission', 'MissionAction', 'NPC', 'Outfit', 'OutfitAttributes', 'OutfitEffect', 'OutfitPenalty', 'Phrase', 'Planet', 'Ship', 'Sound', 'Sprite', 'SubExpression', 'System', 'SystemLink', 'TextReplacements', 'Wormhole', 'WormholeLink', 'locationfilter_government', 'locationfilter_system']);
+			if (!$loaded) {
+				$sources = ['/Users/tcollett/Development/ThirdParty/endless-sky/'];
+				GameData::SetSources($sources);
+				//$this->loadImageDB();		
+				$images = GameData::FindImages();
+				
+				// From the name, strip out any frame number, plus the extension.
+				foreach ($images as $imageName => $ImageSet) {
+					// This should never happen, but just in case:
+					if (!$ImageSet) {
+						continue;
+					}
+				
+					// Reduce the set of images to those that are valid.
+					$ImageSet->validateFrames();
+				}
+				SpriteSet::SetImageData($images);
+				GameData::Objects()->load($sources, true, $this->em);
+				
+				// $universeSerial = serialize(GameData::Objects());
+				// file_put_contents($this->universeCachePath, $universeSerial);
+			} else if ($loadImages) {
+				$this->loadImageDB();
+				SpriteSet::SetImageData($this->images);
+			}
+			$this->logger->debug('LUFF finishing loading');
+			GameData::Objects()->finishLoading($this->em);
+			$this->em->flush();
+		}
+		$this->logger->debug('LUFF done');
 	}
 	
 	public function getImages() {
@@ -165,13 +238,13 @@ class SkyService {
 			}
 			$imageFile = $imageDir.$filename;
 			//$this->logger->info('Found image '.$imageFile);
-			$imagePath = $this->imageBasePath.$imageFile;
+			$imagePath = $baseDir.$imageFile;
 			if (is_dir($imagePath)) {
 				//$this->logger->info('Is directory, recursing');
 				$imagesHere = array_merge($imagesHere, $this->processImageDir($baseDir, $imageFile));
 			} else {
-				$pathInfo = pathinfo($imagePath);
-				$strippedFilename = str_replace(['+'], [''], $pathInfo['filename']);
+				$strippedFilename = ImageSet::Name($filename);
+				//$strippedFilename = str_replace(['+'], [''], $pathInfo['filename']);
 				$imageKey = $imageDir.$strippedFilename;
 				$imageSize = getimagesize($imagePath);
 				$imagesHere[$imageKey] = ['path'=>$imageFile, 'width'=>$imageSize[0], 'height'=>$imageSize[1]];
@@ -238,6 +311,8 @@ class SkyService {
 		$wormholes = $this->data['wormholes'];
 		$colors = $this->data['colors'];
 		$planets = $this->data['planets'];
+		
+		$missions = $this->data['missions'];
 		
 		foreach ($this->elements as $dKey => $element) {
 			if ($dKey == '_filename') {
@@ -443,6 +518,156 @@ class SkyService {
 					}
 					$planets[$thisPlanet->name] = $thisPlanet;
 					break;
+				// case 'mission':
+				// 	$thisMission = new Mission();
+				// 	foreach ($element as $elKey => $elVal) {
+				// 		$this->logger->debug('Mission element with key ['.$elKey.'] and value ['.print_r($elVal,true).']');
+				// 		if ($elKey == '_name') {
+				// 			$this->logger->debug(' - setting the name');
+				// 			if (isset($missions[$elVal])) {
+				// 				$thisMission = $missions[$elVal];
+				// 			} else {
+				// 				$thisMission->name = $elVal;
+				// 			}
+				// 			//$this->logger->info('Processing mission ['.$thisMission['name'].']');
+				// 		} else if ($elKey == 'name') {
+				// 			$this->logger->debug(' - setting the display name');
+				// 			$thisMission->displayName = $elVal[0][0];
+				// 		} else if ($elKey == 'description') {
+				// 			$this->logger->debug(' - setting the desc');
+				// 			$thisMission->description->addText($elVal[0][0]);
+				// 		} else if ($elKey == 'blocked') {
+				// 			$this->logger->debug(' - setting block message');
+				// 			$thisMission->blocked->addText($elVal[0][0]);
+				// 		} else if ($elKey == 'deadline') {
+				// 			$this->logger->debug(' - setting the deadline');
+				// 			$deadlineArray = array();
+				// 			if (isset($elVal[0][0])) {
+				// 				$deadlineArray['days'] = $elVal[0][0];
+				// 			} else {
+				// 				$deadlineArray['days'] = 0;
+				// 			}
+				// 			if (isset($elVal[0][1]))  {
+				// 				$deadlineArray['multiplier'] = $elVal[0][1];
+				// 			} else {
+				// 				$deadlineArray['multiplier'] = 2;
+				// 			}
+				// 			if ($thisMission->deadline) {
+				// 				$deadlineArray['days'] += $thisMission->deadline['days'];
+				// 				$deadlineArray['multiplier'] += $thisMission->deadline['multiplier'];
+				// 			}
+				// 			$thisMission->deadline = $deadlineArray;
+				// 		} else if ($elKey == 'illegal') {
+				// 			$this->logger->debug(' - setting the illegality');
+				// 			$illegalArray = array();
+				// 			$illegalArray['fine'] = $elVal[0][0];
+				// 			if (isset($elVal[0][1])) {
+				// 				$illegalArray['message'] = $elVal[0][1];
+				// 			}
+				// 			
+				// 			$thisMission->illegal = $illegalArray;
+				// 		} else if ($elKey == 'cargo') {
+				// 			$this->logger->debug(' - setting the cargo');
+				// 			$cargoArray = array();
+				// 			$cargoArray['type'] = $elVal[0][0];
+				// 			$cargoArray['count'] = $elVal[0][1];
+				// 			if (isset($elVal[0][2])) {
+				// 				$cargoArray['chanceCount'] = $elVal[0][2];
+				// 			}
+				// 			if (isset($elVal[0][3])) {
+				// 				$cargoArray['chance'] = $elVal[0][3];
+				// 			}
+				// 			$thisMission->cargo = $cargoArray;
+				// 		} else if ($elKey == 'stealth') {
+				// 			$this->logger->debug(' - setting stealth');
+				// 			$thisMission->stealth = true;
+				// 		} else if ($elKey == 'invisible') {
+				// 			$this->logger->debug(' - setting invisible');
+				// 			$thisMission->invisible = true;
+				// 		} else if ($elKey == 'priority') {
+				// 			$this->logger->debug(' - setting priority');
+				// 			$thisMission->priority = true;
+				// 		} else if ($elKey == 'minor') {
+				// 			$this->logger->debug(' - setting minor');
+				// 			$thisMission->minor = true;
+				// 		} else if ($elKey == 'infiltrating') {
+				// 			$this->logger->debug(' - setting '.$elKey);
+				// 			$thisMission->infiltrating = true;
+				// 		} else if (in_array($elKey, ['job', 'landing', 'assisting', 'boarding', 'shipyard', 'outfitter'])) {
+				// 			$this->logger->debug(' - setting offeredAt to '.$elKey);
+				// 			$thisMission->offeredAt = $elKey;
+				// 			if ($elKey == 'boarding' && isset($elVal[0]['override capture'])) {
+				// 				$thisMission->overrideCapture = true;
+				// 			}
+				// 		} else if ($elKey == 'apparent payment') {
+				// 			$this->logger->debug(' - setting '.$elKey);
+				// 			$thisMission->apparentPayment = $elVal[0][0];
+				// 		} else if ($elKey == 'repeat') {
+				// 			$this->logger->debug(' - setting '.$elKey);
+				// 			if (isset($elVal[0][0])) {
+				// 				$thisMission->repeat = $elVal[0][0];
+				// 			} else {
+				// 				$thisMission->repeat = -1;
+				// 			}
+				// 		} else if ($elKey == 'clearance') {
+				// 			$this->logger->debug(' - setting '.$elKey);
+				// 			if (isset($elVal[0][0])) {
+				// 				$thisMission->clearance = new Description();
+				// 				$thisMission->clearance->addText($elVal[0][0]);
+				// 			} else {
+				// 				$thisMission->clearance = true;
+				// 			}
+				// 		} else if ($elKey == 'source') {
+				// 			$this->logger->debug(' - setting '.$elKey);
+				// 			if (count($elVal[0]) == 2 && isset($elVal[0][0])) {
+				// 				$thisMission->sourcePlanet = $elVal[0][0];
+				// 			} else {
+				// 				$thisMission->sourceLocations = $this->arrayToLocationFilter($elVal[0]);
+				// 			}
+				// 		} else if ($elKey == 'destination') {
+				// 			$this->logger->debug(' - setting '.$elKey);
+				// 			if (count($elVal[0]) == 2 && isset($elVal[0][0])) {
+				// 				$thisMission->destinationPlanet = $elVal[0][0];
+				// 			} else {
+				// 				$thisMission->destinationLocations = $this->arrayToLocationFilter($elVal[0]);
+				// 			}
+				// 		} else if ($elKey == 'waypoint') {
+				// 			$this->logger->debug(' - setting '.$elKey.'s');
+				// 			foreach ($elVal as $wKey => $wVal) {
+				// 				if ($wKey == '_type') {
+				// 					continue;
+				// 				}
+				// 				if (isset($wVal[0])) {
+				// 					$thisMission->waypoints []= $wVal[0];
+				// 				} else {
+				// 					$thisMission->waypoints []= $this->arrayToLocationFilter($wVal);
+				// 				}
+				// 			}
+				// 		} else if ($elKey == 'stopover') {
+				// 			$this->logger->debug(' - setting '.$elKey.'s');
+				// 			foreach ($elVal as $wKey => $wVal) {
+				// 				if ($wKey == '_type') {
+				// 					continue;
+				// 				}
+				// 				if (isset($wVal[0])) {
+				// 					$thisMission->stopovers []= $wVal[0];
+				// 				} else {
+				// 					$thisMission->stopovers []= $this->arrayToLocationFilter($wVal);
+				// 				}
+				// 			}
+				// 		} else if ($elKey == 'to') {
+				// 			$this->logger->debug(' - setting '.$elKey.' conditions');
+				// 			foreach ($elVal as $toKey => $toVal) {
+				// 				if ($toKey != '_type') {
+				// 					$thisMission->to[$toVal['_name']] = $this->arrayToConditionList($toVal);
+				// 				}
+				// 			}
+				// 		} else {
+				// 			$this->logger->debug(' - don\'t recognize it');
+				// 		}
+				// 	}
+				// 	$missions[$thisMission->name] = $thisMission;
+				// 	break;
 				default:
 					if (isset($element['_type'])) {
 						$elType = $element['_type'];
@@ -482,6 +707,8 @@ class SkyService {
 		$this->data['governments'] = $governments;
 		$this->data['wormholes'] = $wormholes;
 		$this->data['planets'] = $planets;
+		
+		$this->data['missions'] = $missions;
 	}
 	
 	public function arrayToRamscoop($array) {
@@ -495,6 +722,336 @@ class SkyService {
 		$ramscoop->multiplier = floatval($array['multiplier']);
 		
 		return $ramscoop;
+	}
+	
+	public function arrayToConditionList($array) {
+		$conditions = array();
+		
+		foreach ($array as $key => $val) {
+			if ($key == 'never') {
+				$condition = new Condition();
+				$condition->never = true;
+				
+				$conditions []= $condition;
+				
+				continue;
+			}
+			if ($key == 'has') {
+				$attribute = $val[0][0];
+				$test = '!=';
+				$testVal = 0;
+			} else if ($key == 'not') {
+				$attribute = $val[0][0];
+				$test = '==';
+				$testVal = 0;
+			} else if ($key == 'or') {
+				$this->logger->debug('-- Processing "or" condition with value '.print_r($val, true));
+				$condition = new Condition();
+				$condition->or = $this->arrayToConditionList($val[0]);
+				$conditions []= $condition;
+				
+				continue;
+			} else if ($key == 'and') {
+				$this->logger->debug('-- Processing "and" condition with value '.print_r($val, true));
+				$condition = new Condition();
+				$condition->and = $this->arrayToConditionList($val[0]);
+				$conditions []= $condition;
+				
+				continue;
+			} else if (in_array($key, ['_depth','_name'])) {
+				continue;
+			} else {
+				$attribute = $key;
+				$this->logger->debug('-- Getting info for condition with key '.$key.' and data '.print_r($val,true));
+				$test = $val[0][0];
+				$testVal = $val[0][1];
+			}
+			$condition = new Condition();
+			$condition->attribute = $attribute;
+			$condition->test = $test;
+			$condition->val = floatval($testVal);
+			
+			$conditions []= $condition;
+		}
+		
+		return $conditions;
+	}
+	
+	public function arrayToLocationFilter($array) {
+		$distCalcKeys = ['all wormholes','only unrestricted wormholes','no wormholes','assumes jump drive'];
+		foreach ($array as $fKey => $filter) {
+			$thisFilter = new LocationFilter();
+			if ($fKey == '_type') {
+				continue;
+			}
+			$this->logger->info('Handling location filter ['.print_r($filter, true).']');
+			if (isset($filter['not'])) {
+				if (count($filter['not']) == 1) {
+					foreach ($filter['not'] as $notKey1 => $notVals) {
+						if ($notKey1 == '_type') {
+							continue;
+						}
+						if ($notVals[0] == 'near') {
+							$thisFilter->nearModifier = 'not';
+							$thisFilter->nearSystem = $notVals[1];
+							if (isset($notVals[2])) {
+								$thisFilter->nearSystemMin = intval($notVals[2]);
+							}
+							if (isset($notVals[3])) {
+								$thisFilter->nearSystemMax = intval($notVals[3]);
+							}
+							foreach ($distCalcKeys as $dcKey) {
+								if (isset($notVals[$dcKey])) {
+									if (!isset($thisFilter->nearDistanceCalculationSettings)) {
+										$thisFilter->nearDistanceCalculationSettings = array();
+									}
+									$thisFilter->nearDistanceCalculationSettings []= $dcKey;
+								}
+							}
+						} else if ($notVals[0] == 'distance') {
+							$thisFilter->distanceModifier = 'not';
+							$thisFilter->distanceSystem = $notVals[1];
+							if (isset($notVals[2])) {
+								$thisFilter->distanceSystemMin = intval($notVals[2]);
+							}
+							if (isset($notVals[3])) {
+								$thisFilter->distanceSystemMax = intval($notVals[3]);
+							}
+							foreach ($distCalcKeys as $dcKey) {
+								if (isset($notVals[$dcKey])) {
+									if (!isset($thisFilter->distanceDistanceCalculationSettings)) {
+										$thisFilter->distanceDistanceCalculationSettings = array();
+									}
+									$thisFilter->distanceDistanceCalculationSettings []= $dcKey;
+								}
+							}
+						} else {
+							$notType = $notVals[0].'Not';
+							$thisFilter->$notType = array();
+							foreach ($filter['not'][0] as $notKey => $notVal) {
+								if (!is_numeric($notKey) || $notKey < 1) {
+									continue;
+								}
+								$thisFilter->$notType []= $notVal;
+							}
+						}
+					}
+				} else {
+					$thisFilter->not = $this->arrayToLocationFilter($notVal);
+				}
+			}
+			if (isset($filter['neighbor'])) {
+				if (count($filter['neighbor']) == 1) {
+					foreach ($filter['neighbor'] as $neighborKey1 => $neighborVals) {
+						if ($neighborKey1 == '_type') {
+							continue;
+						}
+						if ($neighborVals[0] == 'near') {
+							$thisFilter->nearModifier = 'neighbor';
+							$thisFilter->nearSystem = $neighborVals[1];
+							if (isset($neighborVals[2])) {
+								$thisFilter->nearSystemMin = intval($neighborVals[2]);
+							}
+							if (isset($neighborVals[3])) {
+								$thisFilter->nearSystemMax = intval($neighborVals[3]);
+							}
+							foreach ($distCalcKeys as $dcKey) {
+								if (isset($neighborVals[$dcKey])) {
+									if (!isset($thisFilter->nearDistanceCalculationSettings)) {
+										$thisFilter->nearDistanceCalculationSettings = array();
+									}
+									$thisFilter->nearDistanceCalculationSettings []= $dcKey;
+								}
+							}
+						} else if ($neighborVals[0] == 'distance') {
+							$thisFilter->distanceModifier = 'neighbor';
+							$thisFilter->distanceSystem = $neighborVals[1];
+							if (isset($neighborVals[2])) {
+								$thisFilter->distanceSystemMin = intval($neighborVals[2]);
+							}
+							if (isset($neighborVals[3])) {
+								$thisFilter->distanceSystemMax = intval($neighborVals[3]);
+							}
+							foreach ($distCalcKeys as $dcKey) {
+								if (isset($neighborVals[$dcKey])) {
+									if (!isset($thisFilter->distanceDistanceCalculationSettings)) {
+										$thisFilter->distanceDistanceCalculationSettings = array();
+									}
+									$thisFilter->distanceDistanceCalculationSettings []= $dcKey;
+								}
+							}
+						} else {
+							$neighborType = $neighborVals[0].'neighbor';
+							$thisFilter->$neighborType = array();
+							foreach ($filter['neighbor'][0] as $neighborKey => $neighborVal) {
+								if (!is_numeric($neighborKey) || $neighborKey < 1) {
+									continue;
+								}
+								$thisFilter->$neighborType []= $neighborVal;
+							}
+						}
+					}
+				} else {
+					$thisFilter->neighbor = $this->arrayToLocationFilter($neighborVal);
+				}
+			}
+			if (isset($filter['attributes'])) {
+				if (!isset($thisFilter->attributes)) {
+					$thisFilter->attributes = array();
+				}
+				if (count($filter['attributes']) == 1) {
+					foreach ($filter['attributes'][0] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->attributes []= $attrVal;
+					}
+				} else {
+					foreach ($filter['attributes'] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->attributes []= $attrVal[0];
+					}
+				}
+			}
+			if (isset($filter['planet'])) {
+				if (!isset($thisFilter->planet)) {
+					$thisFilter->planets = array();
+				}
+				if (count($filter['planet']) == 1) {
+					foreach ($filter['planet'][0] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->planets []= $attrVal;
+					}
+				} else {
+					foreach ($filter['planet'] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->planets []= $attrVal[0];
+					}
+				}
+			}
+			if (isset($filter['system'])) {
+				if (!isset($thisFilter->system)) {
+					$thisFilter->systems = array();
+				}
+				if (count($filter['system']) == 1) {
+					foreach ($filter['system'][0] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->systems []= $attrVal;
+					}
+				} else {
+					foreach ($filter['system'] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->systems []= $attrVal[0];
+					}
+				}
+			}
+			if (isset($filter['government'])) {
+				if (!isset($thisFilter->government)) {
+					$thisFilter->governments = array();
+				}
+				if (count($filter['government']) == 1) {
+					foreach ($filter['government'][0] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->governments []= $attrVal;
+					}
+				} else {
+					foreach ($filter['government'] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->governments []= $attrVal[0];
+					}
+				}
+			}
+			if (isset($filter['outfits'])) {
+				if (!isset($thisFilter->outfit)) {
+					$thisFilter->outfits = array();
+				}
+				if (count($filter['outfits']) == 1) {
+					foreach ($filter['outfits'][0] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->outfits []= $attrVal;
+					}
+				} else {
+					foreach ($filter['outfits'] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->outfits []= $attrVal[0];
+					}
+				}
+			}
+			if (isset($filter['category'])) {
+				if (!isset($thisFilter->category)) {
+					$thisFilter->categories = array();
+				}
+				if (count($filter['category']) == 1) {
+					foreach ($filter['category'][0] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->categories []= $attrVal;
+					}
+				} else {
+					foreach ($filter['category'] as $attrKey => $attrVal) {
+						if (!is_numeric($attrKey)) {
+							continue;
+						}
+						$thisFilter->categories []= $attrVal[0];
+					}
+				}
+			}
+			if (isset($filter['near'])) {
+				$thisFilter->nearSystem = $filter['near'][0][0];
+				if (isset($filter['near'][0][1])) {
+					$thisFilter->nearSystemMin = intval($filter['near'][0][1]);
+				}
+				if (isset($filter['near'][0][2])) {
+					$thisFilter->nearSystemMax = intval($filter['near'][0][1]);
+				}
+				foreach ($distCalcKeys as $dcKey) {
+					if (isset($filter['near'][$dcKey])) {
+						if (!isset($thisFilter->nearDistanceCalculationSettings)) {
+							$thisFilter->nearDistanceCalculationSettings = array();
+						}
+						$thisFilter->nearDistanceCalculationSettings []= $dcKey;
+					}
+				}
+			}
+			if (isset($filter['distance'])) {
+				$thisFilter->distanceSystem = $filter['distance'][0][0];
+				if (isset($filter['distance'][0][1])) {
+					$thisFilter->distanceSystemMin = intval($filter['distance'][0][1]);
+				}
+				if (isset($filter['distance'][0][2])) {
+					$thisFilter->distanceSystemMax = intval($filter['distance'][0][1]);
+				}
+				foreach ($distCalcKeys as $dcKey) {
+					if (isset($filter['distance'][$dcKey])) {
+						if (!isset($thisFilter->distanceDistanceCalculationSettings)) {
+							$thisFilter->distanceDistanceCalculationSettings = array();
+						}
+						$thisFilter->distanceDistanceCalculationSettings []= $dcKey;
+					}
+				}
+			}
+		}
+		
+		return $thisFilter;
 	}
 	
 	public function arrayToSystemObject($system, $parent, $array) {
@@ -545,7 +1102,7 @@ class SkyService {
 					$parentName = $parent->sprite;
 				}
 				//$this->logger->info(' - Adding system object ['.print_r($thisObject, true).'] to parent '.$parentName);
-				$parent->children []= $thisObject;
+				$parent->getChildren() []= $thisObject;
 			} else {
 				$system->objects []= $thisObject;
 				//$this->logger->info(' - Adding system object ['.print_r($thisObject, true).'] to system '.$system->name.' (has '.count($system->objects).' object(s) now)');

@@ -1,0 +1,4 @@
+var planets = {};
+{% for planetName, planet in planets %}
+planets["{{ planetName|raw }}"] = {{ planet|json_encode|raw }};
+{% endfor %}

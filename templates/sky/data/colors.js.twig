@@ -1,0 +1,4 @@
+var colors = {};
+{% for colorName, color in colors %}
+colors["{{ colorName|raw }}"] = {{ color|json_encode|raw }};
+{% endfor %}

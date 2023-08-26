@@ -1,7 +1,14 @@
+@font-face {
+	font-family: 'Ubuntu';
+	src:url('/fonts/Ubuntu/Ubuntu-Regular.ttf');
+	font-weight: normal;
+	font-style: normal;
+}
 
 body {
-	background-color: black;
-	color: white;
+	background-color: rgb(40,40,40);
+	color: rgb(190,190,190);
+	font-family: Ubuntu, sans-serif;
 }
 .debug {
 	color: pink;
@@ -12,13 +19,13 @@ body {
 a:link {
 	color: skyblue;
 }
-a:link:hover {
+a:link:hover, a:hover {
 	color: aliceblue;
 }
-a:link:active {
+a:link:active, a:active {
 	color: white;
 }
-a:link:visited {
+a:link:visited, a:visited {
 	color: lightblue;
 }
 
@@ -109,4 +116,51 @@ a:link:visited {
 
 #content {
 	margin-top: 30px;
+}
+
+.missionCard {
+	display: inline-block;
+	border-radius: 10px;
+	border: 5px outset aliceblue;
+	background-color: darkslateblue;
+	min-width: 50em;
+}
+.missionNameContainer {
+	border-radius: 10px;
+	background-color: darkslategray;
+	font-size: 130%;
+}
+.missionName {
+	color: peachpuff;
+}
+.missionDisplayName {
+	color: linen;
+}
+.missionDefinition {
+	display: none;
+	unicode-bidi: embed;
+	font-family: monospace;
+	/* white-space: pre; */
+}
+.missionDefinitionHeader {
+	cursor: pointer;
+}
+.eventName {
+	font-family: monospace;
+}
+.missionChain {
+	display: grid;
+	grid-template-columns: 50em auto;
+}
+.unlockedMissionsOuter {
+	margin-left: 1em;
+}
+.unlockedMissionsHeader {
+	cursor: pointer;
+}
+.unlockedMissions {
+	display: none;
+}
+.unlockedMissions .missionChain {
+	margin: 0.5em;
 }

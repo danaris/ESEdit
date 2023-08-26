@@ -2,7 +2,7 @@
 
 namespace App\Entity\Sky;
 
-class Submunition {
+class TGCSubmunition {
 	public string $name = '';
 	public int $count = 0;
 	public ?float $facing = null;

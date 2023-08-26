@@ -1,0 +1,4 @@
+var wormholes = {};
+{% for wormholeName, wormhole in wormholes %}
+wormholes["{{ wormholeName|raw }}"] = {{ wormhole|json_encode|raw }};
+{% endfor %}

@@ -1,0 +1,26 @@
+var ships = {};
+{% for shipId, ship in ships %}
+ships[{{ shipId }}] = {{ ship|json_encode|raw }};
+if (ships[{{ shipId }}].attributesOutfit != undefined) {
+	ships[{{ shipId }}].attributesOutfit.get = function(attrName) {
+		if (this.attributes[attrName] != undefined) {
+			return this.attributes[attrName];
+		} else if (this.fallback) {
+			return this.fallback.get(attrName);
+		} else {
+			return 0;
+		}
+	};
+}
+if (ships[{{ shipId }}].baseAttributesOutfit != undefined) {
+	ships[{{ shipId }}].baseAttributesOutfit.get = function(attrName) {
+		if (this.attributes[attrName] != undefined) {
+			return this.attributes[attrName];
+		} else if (this.fallback) {
+			return this.fallback.get(attrName);
+		} else {
+			return 0;
+		}
+	};
+}
+{% endfor %}

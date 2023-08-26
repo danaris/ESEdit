@@ -1,0 +1,25 @@
+{% for governmentName, government in governments %}
+	{% if governmentName != 'Uninhabited' %}
+		{% if government.color is defined and government.color != '' %}
+			{% set govColor = colorToCSS(government.color) %}
+		{% else %}
+			{% set govColor = false %}
+		{% endif %}
+		{% if govColor %}
+
+.{{ governmentName|cssNameEsc|raw }}-system {
+	stroke: {{ govColor|raw }};
+	fill: black;
+}
+.{{ governmentName|cssNameEsc|raw }}-system.unoccupied {
+	fill: {{ govColor|raw }};
+	stroke: rgb(102,102,102);
+}
+.{{ governmentName|cssNameEsc|raw }}-text {
+	color: {{ govColor|raw }};
+}
+		{% else %}
+/* No color for government {{ governmentName }} */
+		{% endif %}
+	{% endif %}
+{% endfor %}

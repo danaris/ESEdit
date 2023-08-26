@@ -1,0 +1,62 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Mission Test{% endblock %}
+
+{% block content %}
+{% set curFile = '' %}
+<ol>
+{% for missionName, mission in missions %}
+	{% if mission.fromFile != curFile %}
+		{% set curFile = mission.fromFile %}
+		<li>---- New File: {{ curFile }} ----</li>
+	{% endif %}
+	{# {% if prerequisites[missionName] is not defined %}
+		<li>Mission "{{ mission.identifier }}": <br>
+			{% if mission.toOffer.expressions|length > 0 %}
+			To offer: <ul>
+				{% for expression in mission.toOffer.expressions %}
+				<li>{{ expression }}</li>
+				{% endfor %}
+			</ul><br>
+			{% endif %}
+			{% if revPrerequisites[missionName] is defined %}
+			Unlocks mission(s):<ul>
+				{% for unlocked in revPrerequisites[missionName] %}
+				<li>{{ unlocked.identifier }}</li>
+				{% endfor %}
+			</ul>
+			{% endif %}
+		</li>
+	{% endif %} #}
+	{% if mission.isUnlockedBy|length == 0 %}
+		{% include 'sky/mission.html.twig' %}
+	{% endif %}
+{% endfor %}
+</ol>
+
+<script>
+$(function() {
+	$(".missionDefinitionHeader").on('click',function(event) {
+		var open = $(event.target).text().substr(1,1) == '-';
+		if (open) {
+			$(event.target).next().hide();
+			$(event.target).text('[+] Definition');
+		} else {
+			$(event.target).next().show();
+			$(event.target).text('[-] Definition');
+		}
+	});
+	$(".unlockedMissionsHeader").on('click',function(event) {
+		var open = $(event.target).text().substr(1,1) == '-';
+		if (open) {
+			$(event.target).next().hide();
+			$(event.target).text('[+] Unlocked Missions');
+		} else {
+			$(event.target).next().show();
+			$(event.target).text('[-] Unlocked Missions');
+		}
+	});
+});
+</script>
+
+{% endblock %}

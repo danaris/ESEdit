@@ -55,12 +55,11 @@
 <script>
 var systems = {};
 {% for systemName, system in systems %}
-systems['{{ systemName|cssNameEsc }}'] = {name: '{{ systemName|cssNameEsc }}', government: '{% if system.government is defined %}{{ system.government|raw|cssNameEsc }}{% endif %}', hidden: {% if system.hidden %}true{% else %}false{% endif %}, attributes: '{{ system.attributes|join(',')|cssNameEsc }}' };
+systems['{{ systemName|cssNameEsc }}'] = {name: '{{ systemName|cssNameEsc }}', government: '{% if system.government is defined %}{{ system.government.name|raw|cssNameEsc }}{% endif %}', hidden: {% if system.hidden %}true{% else %}false{% endif %}, attributes: '{{ system.attributes|join(',')|cssNameEsc }}' };
 systems['{{ systemName|cssNameEsc }}'].objects = [];
 	{% for object in system.objects %}
-		{% if object.name %}
-			{% set planet = planets[object.name] %}
-			{% if planet.wormhole %}
+		{% if object.planet %}
+			{% if object.planet.isWormhole() %}
 				{% set isWormhole = 'true' %}
 			{% else %}
 				{% set isWormhole = 'false' %}
@@ -68,11 +67,10 @@ systems['{{ systemName|cssNameEsc }}'].objects = [];
 		{% else %}
 			{% set isWormhole = 'false' %}
 		{% endif %}
-systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if object.name %}name: '{{ object.name|cssNameEsc }}', {% endif %}isWormhole: {{ isWormhole }}, sprite: '{{ object.sprite }}', distance: {{ object.distance }}, period: {{ object.period }}, offset: {{ object.offset }} });
+systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if object.planet %}name: '{{ object.planet.name|cssNameEsc }}', {% endif %}isWormhole: {{ isWormhole }}, sprite: '{{ object.sprite.name }}', distance: {{ object.distance }}, period: {{ object.speed / 360 }}, offset: {{ object.offset }} });
 		{% for child in object.children %}
-			{% if child.name %}
-				{% set planet = planets[child.name] %}
-				{% if planet.wormhole %}
+			{% if child.planet %}
+				{% if child.planet.isWormhole() %}
 					{% set isWormhole = 'true' %}
 				{% else %}
 					{% set isWormhole = 'false' %}
@@ -80,12 +78,12 @@ systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if object.name %}name: 
 			{% else %}
 				{% set isWormhole = 'false' %}
 			{% endif %}
-			{% if object.name %}
-				{% set parentName = object.name %}
+			{% if object.planet %}
+				{% set parentName = object.planet.name %}
 			{% else %}
-				{% set parentName = object.sprite %}
+				{% set parentName = object.sprite.name %}
 			{% endif %}
-systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if child.name %}name: '{{ child.name|cssNameEsc }}', {% endif %}isWormhole: {{ isWormhole }}, sprite: '{{ child.sprite }}', distance: {{ child.distance }}, period: {{ child.period }}, offset: {{ child.offset }}, childOf: '{{ parentName }}' });
+systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if child.planet %}name: '{{ child.planet.name|cssNameEsc }}', {% endif %}isWormhole: {{ isWormhole }}, sprite: '{{ child.sprite.name }}', distance: {{ child.distance }}, period: {{ child.speed / 360 }}, offset: {{ child.offset }}, childOf: '{{ parentName }}' });
 		{% endfor %}
 	{% endfor %}
 {% endfor %}
@@ -108,48 +106,46 @@ systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if child.name %}name: '
 	</defs>
 	<g id="galaxyMap">
 	{% for galaxyName, galaxy in galaxies %}
-		{% if images[galaxy.sprite] is defined %}
-			{% set spriteImage = images[galaxy.sprite] %}
-		<image id="{{ galaxy.name }}-sprite" xlink:href="{{ path('SkyImagePath', {imagePath: spriteImage['path']}) }}" x="{{ 2048 + galaxy.pos.x - (spriteImage['width']/2) }}" y="{{ 2048 + galaxy.pos.y - (spriteImage['height']/2) }}" />
+		<!-- Galaxy sprite: {{ galaxyName }} = {{ galaxy.sprite }} -->
+		{% if galaxy.sprite %}
+			<!-- Galaxy sprite valid -->
+		<image id="{{ galaxy.name }}-sprite" xlink:href="{{ path('SkyImagePath', {spriteId: galaxy.sprite.id}) }}" x="{{ 2048 + galaxy.position.x - (galaxy.sprite.width/2) }}" y="{{ 2048 + galaxy.position.y - (galaxy.sprite.height/2) }}" />
 		{% endif %}
 	{% endfor %}
 	</g>
 	<g id="systemLinks">
-	{% for systemName, system in systems %}
-		{% for link in system.links %}
-			{% if systems[link.to] is defined %}
-				{% if system.pos is defined %}
-					{% if systems[link.to].pos is defined %}
-				<line id="{{ systemName|raw|cssNameEsc }}-{{ link.to|raw|cssNameEsc }}-link" x1="{{ 2048 + system.pos.x }}" y1="{{ 2048 + system.pos.y }}" x2="{{ 2048 + systems[link.to].pos.x }}" y2="{{ 2048 + systems[link.to].pos.y }}" stroke-opacity="0.7" style="stroke-width: 1px; stroke: lightgray;"/>
-					{% else %}
-					<!-- {{ dump(systems[link.to]) }} -->
-					{% endif %}
+	{% for fromName, toSystems in links %}
+		{% set system = systems[fromName] %}
+		{% for toSystem in toSystems %}
+			{% if system.position is defined %}
+				{% if toSystem.position is defined %}
+			<line id="{{ fromName|raw|cssNameEsc }}-{{ toSystem.name|raw|cssNameEsc }}-link" x1="{{ 2048 + system.position.x }}" y1="{{ 2048 + system.position.y }}" x2="{{ 2048 + toSystem.position.x }}" y2="{{ 2048 + toSystem.position.y }}" stroke-opacity="0.7" style="stroke-width: 1px; stroke: lightgray;"/>
 				{% else %}
-				<!-- {{ dump(system) }} -->
+				<!-- {{ dump(toSystem) }} -->
 				{% endif %}
+			{% else %}
+			<!-- {{ dump(system) }} -->
 			{% endif %}
 		{% endfor %}
 	{% endfor %}
 	</g>
 	<g id="wormholes">
 	{% for wormholeName, wormhole in wormholes %}
-		{% for link in wormhole.links %}
-			{% if systems[link.from] is defined and systems[link.to] is defined %}
-				{% if wormhole.color is defined %}
-					{% set wormholeColor = colorToCSS(wormhole.color) %}
+		<!-- Checking for wormhole links from {{ wormhole.planet.trueName }} -->
+		{% for fromName, toSystem in wormhole.links %}
+			<!-- Drawing link from {{ fromName }} to {{ toSystem.name }} -->
+			{% if systems[fromName] is defined and toSystem is defined %}
+				{% if wormhole.linkColor is defined %}
+					{% set wormholeColor = colorToCSS(wormhole.linkColor) %}
 				{% else %}
 					{% set wormholeColor = colorToCSS(colors['map wormhole']) %}
 				{% endif %}
-				{% set fromSystem = systems[link.from] %}
-				{% set toSystem = systems[link.to] %}
-				<line class="wormhole" id="{{ link.from|raw|cssNameEsc }}-{{ link.to|raw|cssNameEsc }}-hole" x1="{{ 2048 + fromSystem.pos.x }}" y1="{{ 2048 + fromSystem.pos.y }}" x2="{{ 2048 + toSystem.pos.x }}" y2="{{ 2048 + toSystem.pos.y }}" stroke="{{ wormholeColor }}" {% if wormhole.active %}stroke-opacity="0.7"{% else %}stroke-opacity="0.3"{% endif %} style="stroke-width: 2px;"/>
-				{% if link.angle is defined and link.angle %}
-				<use class="wormhole" x="{{ 2048 + fromSystem.pos.x }}" y="{{ 2048 + fromSystem.pos.y }}" href="#revArrow" stroke-width="2"{% if wormholeColor %} stroke="{{ wormholeColor }}"{% endif %} transform="rotate({{ link.angle }} {{ 2048 + fromSystem.pos.x }} {{ 2048 + fromSystem.pos.y }})" />
-				{% else %}
-				<!-- No angle for wormhole link from {{ link.from }} to {{ link.to }} -->
-				{% endif %}
+				{% set fromSystem = systems[fromName] %}
+				{% set angle = angleBetween(fromSystem.position, toSystem.position) %}
+				<line class="wormhole" id="{{ fromName|raw|cssNameEsc }}-{{ toSystem.name|raw|cssNameEsc }}-hole" x1="{{ 2048 + fromSystem.position.x }}" y1="{{ 2048 + fromSystem.position.y }}" x2="{{ 2048 + toSystem.position.x }}" y2="{{ 2048 + toSystem.position.y }}" stroke="{{ wormholeColor }}" {% if activeWormholes[wormhole.planet.trueName] is defined and activeWormholes[wormhole.planet.trueName] %}stroke-opacity="0.7"{% else %}stroke-opacity="0.3"{% endif %} style="stroke-width: 2px;"/>
+				<use class="wormhole" x="{{ 2048 + fromSystem.position.x }}" y="{{ 2048 + fromSystem.position.y }}" href="#revArrow" stroke-width="2"{% if wormholeColor %} stroke="{{ wormholeColor }}"{% endif %} transform="rotate({{ angle }} {{ 2048 + fromSystem.position.x }} {{ 2048 + fromSystem.position.y }})" />
 			{% else %}
-			<!-- Can't display wormhole from {{ link.from }} to {{ link.to }} -->
+			<!-- Can't display wormhole from {{ fromName }} to {{ toSystem.name }} -->
 			{% endif %}
 		{% endfor %}
 	{% endfor %}
@@ -160,22 +156,12 @@ systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if child.name %}name: '
 		{% set xOffset = 8 * nameLen / 2 %}
 		{% set yOffset = 16 %}
 		{% set sysStatus = 'unoccupied' %}
-		{% if system.government != 'Uninhabited' %}
-			{% for object in system.objects %}
-				{% if object.name %}
-					{% set sysStatus = 'occupied' %}
-				{% elseif object.children|length > 0 %}
-					{% for child in object.children %}
-						{% if child.name %}
-							{% set sysStatus = 'occupied' %}
-						{% endif %}
-					{% endfor %}
-				{% endif %}
-			{% endfor %}
+		{% if system.government.name != 'Uninhabited' and system.isInhabited() %}
+			{% set sysStatus = 'occupied' %}
 		{% endif %}
-		{% if system.pos is defined %}
-		<use id="{{ systemName|raw|cssNameEsc }}-system"{% if system.hidden %} stroke-opacity="0.5"{% endif %} class="system {{ system.government|raw|cssNameEsc }} {{ sysStatus }}" x="{{ 2048 + system.pos.x }}" y="{{ 2048 + system.pos.y }}" onclick="showSystem('{{ systemName|raw|cssNameEsc }}');" href="#system"><title>{{ system.name }}</title></use>
-		<text id="{{ systemName|raw|cssNameEsc }}-systemName" class="systemName{% if system.hidden %} hidden{% endif %}" x="{{ 2048 + system.pos.x - xOffset }}" y="{{ 2048 + system.pos.y + yOffset }}" onclick="showSystem('{{ systemName|raw|cssNameEsc }}');">{{ systemName }}</text>
+		{% if system.position is defined %}
+		<use id="{{ systemName|raw|cssNameEsc }}-system"{% if system.hidden %} stroke-opacity="0.5"{% endif %} class="system {{ system.government.name|raw|cssNameEsc }} {{ sysStatus }}" x="{{ 2048 + system.position.x }}" y="{{ 2048 + system.position.y }}" onclick="showSystem('{{ systemName|raw|cssNameEsc }}');" href="#system"><title>{{ system.name }}</title></use>
+		<text id="{{ systemName|raw|cssNameEsc }}-systemName" class="systemName{% if system.hidden %} hidden{% endif %}" x="{{ 2048 + system.position.x - xOffset }}" y="{{ 2048 + system.position.y + yOffset }}" onclick="showSystem('{{ systemName|raw|cssNameEsc }}');">{{ systemName }}</text>
 		{% else %}
 		<!-- dump(system) -->
 		{% endif %}
@@ -183,17 +169,17 @@ systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if child.name %}name: '
 	</g>
 </svg>
 
-<div class="error">
+{# <div class="error">
 	{% for error in errors %}
 	<p>{{ error }}</p>
 	{% endfor %}
-</div>
+</div> #}
 
-<div class="debug">
+{# <div class="debug">
 	{# Images:
-	{{ dump(images) }} #}
+	{{ dump(images) }} 
 	{# Data:
-	<pre>{{ data }}</pre> #}
+	<pre>{{ data }}</pre> 
 	Govs:
 	{{ dump(governments) }}
 	Colors:
@@ -207,28 +193,28 @@ systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if child.name %}name: '
 	url: {{ testSystem.name|e('url') }}<br>
 	html_attr: {{ testSystem.name|e('html_attr') }}<br>
 	
-</div>
+</div> #}
 {% for systemName, system in systems %}
 <div id="systemDetails-{{ systemName|raw|cssNameEsc }}" class="systemDetails">
 	<div class="sysDetail systemName">{{ system.name }}{% if system.hidden %} (hidden){% endif %}</div>
-	<div class="sysDetail systemGovernment {{ system.government|raw|cssNameEsc }}">{{ system.government }}</div>
+	<div class="sysDetail systemGovernment {{ system.government.name|raw|cssNameEsc }}">{{ system.government.name }}</div>
 	<div class="sysDetail systemAttributes">{{ system.attributes|join(', ') }}</div>
 	<div class="sysDetail systemObjects">
 	{% for object in system.objects %}
 		<p>System Objects:</p>
-		{% if object.name %}<div class="sysObjectName">{{ object.name }}</div>{% endif %}
-		<div class="sysDetail sysObjectSprite">Sprite: {{ object.sprite }}</div>
+		{% if object.planet %}<div class="sysObjectName">{{ object.planet.name }}</div>{% endif %}
+		<div class="sysDetail sysObjectSprite">Sprite: {{ object.sprite.name }}</div>
 		<div class="sysDetail sysObjectDistance">Distance: {{ object.distance }}</div>
-		<div class="sysDetail sysObjectPeriod">Period: {{ object.period }}</div>
+		<div class="sysDetail sysObjectPeriod">Period: {{ object.speed / 360 }}</div>
 		{% if object.offset %}<div class="sysDetail sysObjectOffset">Offset: {{ object.offset }}</div>{% endif %}
 		{% if object.children|length > 0 %}
 		<div class="sysDetail systemChildObjects">
 			<p>Children:</p>
 			{% for child in object.children %}
-			{% if child.name %}<div class="sysObjectName">{{ child.name }}</div>{% endif %}
-			<div class="sysDetail sysObjectSprite">Sprite: {{ child.sprite }}</div>
+			{% if child.planet %}<div class="sysObjectName">{{ child.planet.name }}</div>{% endif %}
+			<div class="sysDetail sysObjectSprite">Sprite: {{ child.sprite.name }}</div>
 			<div class="sysDetail sysObjectDistance">Distance: {{ child.distance }}</div>
-			<div class="sysDetail sysObjectPeriod">Period: {{ child.period }}</div>
+			<div class="sysDetail sysObjectPeriod">Period: {{ child.speed / 360 }}</div>
 			{% if child.offset %}<div class="sysDetail sysObjectOffset">Offset angle: {{ child.offset }}</div>{% endif %}
 			{% endfor %}
 		</div>

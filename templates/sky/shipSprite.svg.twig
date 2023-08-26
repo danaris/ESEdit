@@ -1,0 +1,390 @@
+<script>
+var frameCount = {{ Ship.sprite.frames }};
+var frameRate = {{ 1 / (Ship.frameRate * 60) }};
+var frameOffset = {{ Ship.frameOffset }};
+var rewind = {{ Ship.rewind ? 'true' : 'false' }};
+var playing = true;
+var curFrame = 0;
+var lastFrame = 0;
+var step = 1;
+var animationTimer = -1;
+var imagesToLoad = frameCount;
+function updateSprite(ship) {
+	var shipSprite = sprites[ship.spriteId];
+	frameCount = shipSprite.frames;
+	frameRate = 1 / (ship.frameRate * 60);
+	frameOffset = ship.frameOffset;
+	rewind = ship.rewind;
+	curFrame = 0;
+	lastFrame = 0;
+	step = 1;
+	imagesToLoad = frameCount;
+	if (animationTimer != -1) {
+		clearInterval(animationTimer);
+	}
+	$("#swizzled").html('');
+	$("#hardpointsUnder").html('');
+	$("#hardpointsOver").html('');
+	$("#hardpointHighlights").html('');
+	$("#swizzleSvg-" + {{ Ship.id }}).attr('width', shipSprite.width);
+	$("#swizzleSvg-" + {{ Ship.id }}).attr('height', shipSprite.height);
+	$("#swizzleSvg-" + {{ Ship.id }}).attr('viewBox', '0 0 ' + shipSprite.width + ' ' + shipSprite.height);
+	for (var i=0; i<shipSprite.frames; i++) {
+		var img = document.createElementNS('http://www.w3.org/2000/svg','image');
+		img.setAttributeNS(null,'class','swizzleReady');
+		img.setAttributeNS(null,'height',shipSprite.height);
+		img.setAttributeNS(null,'width',shipSprite.width);
+		img.setAttributeNS(null,'id','spriteImage' + i);
+		img.setAttributeNS('http://www.w3.org/1999/xlink','href','/skyImage/' + shipSprite.id + '/' + i);
+		img.setAttributeNS(null,'x',0);
+		img.setAttributeNS(null,'y',0);
+		$("#swizzled").append(img);
+		
+		var image = new Image();
+		image.src = '/skyImage/' + shipSprite.id + '/' + i;
+		if (frameCount > 1) {
+			image.onload = imageLoaded;
+		}
+	}
+	$("#swizzleSvg-" + {{ Ship.id }}).html($("#swizzleSvg-" + {{ Ship.id }}).html());
+}
+function animateSprite() {
+	if (curFrame >= frameCount || curFrame < 0) {
+		if (rewind) { // We just bounce
+			step *= -1;
+			curFrame += step * 2; // to undo the wrong step we took + go the other way
+		} else { // we loop, and this only happens going up, so we can loop back to 0
+			curFrame = 0;
+		}
+	}
+	$("#spriteImage"+curFrame).show();
+	$("#spriteImage"+lastFrame).hide();
+	lastFrame = curFrame;
+	curFrame += step;
+}
+function imageLoaded() {
+	imagesToLoad--;
+	console.log("Image loaded; " + imagesToLoad + " to go");
+	if (imagesToLoad <= 0 && animationTimer == -1) {
+		animationTimer = setInterval(animateSprite, frameRate * 1000);
+	}
+}
+$(function() {
+	if (frameCount > 1) {
+		for (var i=0; i<frameCount; i++) {
+			var image = new Image();
+			image.src = '/skyImage/{{ Sprite.id }}/'+i;
+			image.onload = imageLoaded;
+		}
+	}
+});
+</script>
+
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="{{ displayWidth }}" height="{{ displayHeight }}" viewBox="0 0 {{ Sprite.width }} {{ Sprite.height }}" id="swizzleSvg-{{ Ship.id }}">
+	<defs>
+		<filter id="swizzle0">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  0 1 0 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle1">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  0 0 1 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		</filter>
+		<filter id="swizzle2">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  1 0 0 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle3">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  1 0 0 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle4">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  0 0 1 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle5">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  0 1 0 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle6">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  0 0 1 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle7">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  0 0 1 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle8">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  0 1 0 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle9">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  0 0 1 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle10">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  0 1 0 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle11">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  1 0 0 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle12">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  0 0 1 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle13">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  0 0 1 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle14">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  0 1 0 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle15">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  0 1 0 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle16">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  1 0 0 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle17">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  1 0 0 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle18">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  0 1 0 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle19">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  1 0 0 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle20">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  1 0 0 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle21">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  0 1 0 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle22">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  1 0 0 0 0
+					  0 0 1 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle23">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  1 0 0 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle24">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 1 0 0 0
+					  0 0 1 0 0
+					  0 1 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle25">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  0 0 1 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle26">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  0 1 0 0 0
+					  1 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle27">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 1 0 0
+					  0 0 0 0 0
+					  0 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle28">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="0 0 0 0 0
+					  0 0 0 0 0
+					  0 0 0 0 0
+					  0 0 0 1 0" />
+		  </filter>
+		<filter id="swizzle0x">
+			<feColorMatrix
+			  in="SourceGraphic"
+			  type="matrix"
+			  values="1 0 0 0 0
+					  0 1 0 0 0
+					  0 0 1 0 0.5
+					  0 0 0 1 0" />
+		  </filter>
+		  <filter id="glow" height="300%" width="300%" x="-75%" y="-75%">
+			  <!-- Thicken out the original shape -->
+			  <feMorphology operator="dilate" radius="2" in="SourceAlpha" result="thicken" />
+		  
+			  <!-- Use a gaussian blur to create the soft blurriness of the glow -->
+			  <feGaussianBlur in="thicken" stdDeviation="1.5" result="blurred" />
+		  
+			  <!-- Change the colour -->
+			  <feFlood flood-color="rgba(255,255,255, 0.7)" result="glowColor" />
+		  
+			  <!-- Color in the glows -->
+			  <feComposite in="glowColor" in2="blurred" operator="in" result="softGlow_colored" />
+		  
+			  <!--	Layer the effects together -->
+			  <feMerge>
+				  <feMergeNode in="softGlow_colored"/>
+				  <feMergeNode in="SourceGraphic"/>
+			  </feMerge>
+		  
+		  </filter>
+		</defs>
+	<g id="hardpointsUnder">
+	</g>
+	<g id="swizzled">
+		<image class="swizzleReady" id="spriteImage0" xlink:href="{{ path("SkyImagePath", {spriteId: Sprite.id}) }}" x="0" y="0" filter="url(#swizzle0)" />
+		{% if Sprite.frames > 1 %}
+			{% for i in 1..Sprite.frames-1 %}
+		<image class="swizzleReady" id="spriteImage{{ i }}" style="display: none;" xlink:href="{{ path("SkyImagePath", {spriteId: Sprite.id, frameId: i}) }}" x="0" y="0" filter="url(#swizzle0)" />
+			{% endfor %}
+		{% endif %}
+	</g>
+	<g id="hardpointsOver">
+	</g>
+	<g id="hardpointHighlights">
+	</g>
+</svg>

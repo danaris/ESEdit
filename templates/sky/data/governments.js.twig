@@ -1,0 +1,4 @@
+var governments = {};
+{% for govName, government in governments %}
+governments["{{ govName|raw }}"] = {{ government|json_encode|raw }};
+{% endfor %}

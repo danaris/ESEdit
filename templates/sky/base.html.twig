@@ -13,7 +13,7 @@
 	<script src="/js/jquery-3.6.0.js"></script>
 	<script src="/js/jquery-ui.js"></script>
 	<script src="/js/jquery.switchButton.js"></script>
-	<link rel="stylesheet" href="/css/sky.css?v=2">
+	<link rel="stylesheet" href="/css/sky.css?v=5">
 	{% block stylesheets %}
 	{% endblock %}
 	{% block javascripts %}
@@ -21,19 +21,19 @@
 	<title>{% block title %}Endless Sky Editor{% endblock %}</title>
 </head>
 <body>
-	{% include 'sky/topbar.html.twig' %}
-	{% for label, messages in app.flashes %}
-	{% for message in messages %}
-		<div class="flash-{{ label }}">
-			{{ message }}
-		</div>
-	{% endfor %}
-	{% endfor %}
+	{% include 'flashes.html.twig' %}
 <div id="content">
 	{% block content %}
 	{% endblock %}
 </div>
 {% block lateScripts %}
 {% endblock %}
+<script>
+function nameEsc(name) {
+	var escString = name.replace(/[ ']/g, '-').replace(/[()]/g,'_');
+	
+	return escString;
+}
+</script>
 </body>
 </html>

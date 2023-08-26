@@ -2,7 +2,7 @@
 
 namespace App\Entity\Sky;
 
-class Asteroid {
+class TGCAsteroid {
 	public string $name;
 	public int $count;
 	public float $energy;

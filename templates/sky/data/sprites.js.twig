@@ -1,0 +1,4 @@
+var sprites = {};
+{% for spriteName, sprite in sprites %}
+sprites["{{ spriteName|raw }}"] = {{ sprite|json_encode|raw }};
+{% endfor %}

@@ -1,0 +1,4 @@
+var systems = {};
+{% for sysName, system in systems %}
+systems["{{ sysName|raw }}"] = {{ system|json_encode|raw }};
+{% endfor %}
