@@ -1,4 +1,4 @@
 var governments = {};
-{% for govName, government in governments %}
-governments["{{ govName|raw }}"] = {{ government|json_encode|raw }};
+{% for government in governments %}
+	{% include 'sky/data/government.js.twig' %}
 {% endfor %}

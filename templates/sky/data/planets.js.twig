@@ -1,4 +1,4 @@
 var planets = {};
-{% for planetName, planet in planets %}
-planets["{{ planetName|raw }}"] = {{ planet|json_encode|raw }};
+{% for planet in planets %}
+	{% include 'sky/data/planet.js.twig' %}
 {% endfor %}

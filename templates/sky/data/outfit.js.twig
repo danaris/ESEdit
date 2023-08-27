@@ -1,0 +1,11 @@
+outfits["{{ outfit.trueName|replace({'"': '\\"'})|raw }}"] = {{ outfit|json_encode|raw }};
+outfits["{{ outfit.trueName|replace({'"': '\\"'})|raw }}"].fallback = null;
+outfits["{{ outfit.trueName|replace({'"': '\\"'})|raw }}"].get = function(attrName) {
+	if (this.attributes[attrName] != undefined) {
+		return this.attributes[attrName];
+	} else if (this.fallback) {
+		return this.fallback.get(attrName);
+	} else {
+		return 0;
+	}
+};

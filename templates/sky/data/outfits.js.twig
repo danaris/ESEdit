@@ -1,14 +1,4 @@
 var outfits = {};
-{% for outfitName, outfit in outfits %}
-outfits["{{ outfitName|raw }}"] = {{ outfit|json_encode|raw }};
-outfits["{{ outfitName|raw }}"].fallback = null;
-outfits["{{ outfitName|raw }}"].get = function(attrName) {
-	if (this.attributes[attrName] != undefined) {
-		return this.attributes[attrName];
-	} else if (this.fallback) {
-		return this.fallback.get(attrName);
-	} else {
-		return 0;
-	}
-};
+{% for outfit in outfits %}
+	{% include 'sky/data/outfit.js.twig' %}
 {% endfor %}

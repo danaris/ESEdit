@@ -1,4 +1,4 @@
 var sprites = {};
-{% for spriteName, sprite in sprites %}
-sprites["{{ spriteName|raw }}"] = {{ sprite|json_encode|raw }};
+{% for sprite in sprites %}
+	{% include 'sky/data/sprite.js.twig' %}
 {% endfor %}

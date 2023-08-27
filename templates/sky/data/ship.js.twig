@@ -1,0 +1,23 @@
+ships[{{ ship.id }}] = {{ ship|json_encode|raw }};
+if (ships[{{ ship.id }}].attributesOutfit != undefined) {
+	ships[{{ ship.id }}].attributesOutfit.get = function(attrName) {
+		if (this.attributes[attrName] != undefined) {
+			return this.attributes[attrName];
+		} else if (this.fallback) {
+			return this.fallback.get(attrName);
+		} else {
+			return 0;
+		}
+	};
+}
+if (ships[{{ ship.id }}].baseAttributesOutfit != undefined) {
+	ships[{{ ship.id }}].baseAttributesOutfit.get = function(attrName) {
+		if (this.attributes[attrName] != undefined) {
+			return this.attributes[attrName];
+		} else if (this.fallback) {
+			return this.fallback.get(attrName);
+		} else {
+			return 0;
+		}
+	};
+}

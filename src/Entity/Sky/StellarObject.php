@@ -5,10 +5,13 @@ namespace App\Entity\Sky;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Event\PostLoadEventArgs;
 
 use App\Entity\DataNode;
 
 #[ORM\Entity]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'StellarObject')]
 class StellarObject extends Body {
 	#[ORM\Id]
@@ -38,18 +41,16 @@ class StellarObject extends Body {
 	public bool $isStation = false;
 	#[ORM\Column(type: 'boolean')]
 	public bool $isMoon = false;
+	
+	#[ORM\Column(type: 'integer', name: 'parentIndex')]
+	private int $parentIndex = -1;
 
-    #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
     private ?self $parent = null;
 
-    #[ORM\OneToMany(mappedBy: 'parent', targetEntity: self::class, fetch: 'EAGER')]
-    private Collection $children;
+    private array $children = [];
 	
 	#[ORM\ManyToOne(targetEntity: System::class, inversedBy: 'objects')]
 	private ?System $system = null;
-	
-	// TGC added
-	//public array $children = [];
 	
 	// Object default constructor.
 	public function __construct() {
@@ -57,7 +58,46 @@ class StellarObject extends Body {
 		// Unlike ships and projectiles, stellar objects are not drawn shrunk to half size,
 		// because they do not need to be so sharp.
 		$this->zoom = 2.;
-        $this->children = new ArrayCollection();
+	}
+	
+	public function getId(): int {
+		return $this->id;
+	}
+	
+	public function setId(int $id): void {
+		$this->id = $id;
+	}
+	
+	public function getDistance(): float {
+		return $this->distance;
+	}
+	
+	public function setDistance(float $distance): void {
+		$this->distance = $distance;
+	}
+	
+	public function getSpeed(): float {
+		return $this->speed;
+	}
+	
+	public function setSpeed(float $speed): void {
+		$this->speed = $speed;
+	}
+	
+	public function getOffset(): float {
+		return $this->offset;
+	}
+	
+	public function setOffset(float $offset): void {
+		$this->offset = $offset;
+	}
+	
+	public function getMessage(): string {
+		return $this->message;
+	}
+	
+	public function setMessage(string $message): void {
+		$this->message = $message;
 	}
 	// 
 	// // Get the radius of this planet, i.e. how close you must be to land.
@@ -185,6 +225,13 @@ class StellarObject extends Body {
 	public function getSystem(): ?System {
 		return $this->system;
 	}
+	
+	public function getIndex(): int {
+		return $this->index;
+	}
+	public function setIndex(int $index): void {
+		$this->index = $index;
+	}
 
     public function getParent(): ?self
     {
@@ -197,20 +244,27 @@ class StellarObject extends Body {
 
         return $this;
     }
+	
+	public function getParentIndex(): int {
+		return $this->parentIndex;
+	}
+	public function setParentIndex(int $parentIndex): void {
+		$this->parentIndex = $parentIndex;
+	}
 
     /**
      * @return Collection<int, self>
      */
-    public function getChildren(): Collection
+    public function getChildren(): array
     {
         return $this->children;
     }
 
     public function addChild(self $child): self
     {
-        if (!$this->children->contains($child)) {
+        if (!in_array($child, $this->children)) {
 			error_log("%- Adding ".$child->sprite?->getName().' as child of '.$this->sprite?->getName());
-            $this->children->add($child);
+            $this->children []= $child;
             $child->setParent($this);
         }
 
@@ -219,7 +273,8 @@ class StellarObject extends Body {
 
     public function removeChild(self $child): self
     {
-        if ($this->children->removeElement($child)) {
+        if ($index = array_search($child, $this->children)) {
+			array_splice($this->children, $index, 1);
             // set the owning side to null (unless already changed)
             if ($child->getParent() === $this) {
                 $child->setParent(null);
@@ -229,10 +284,31 @@ class StellarObject extends Body {
         return $this;
     }
 	
+	#[ORM\PreFlush]
+	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		if ($this->parent && $this->parent->index != $this->parentIndex) {
+			$this->parentIndex = $this->parent->index;
+		}
+		foreach ($this->children as $ChildObject) {
+			if ($ChildObject->parentIndex != $this->index) {
+				$ChildObject->parentIndex = $this->index;
+			}
+		}
+	}
+	
+	#[ORM\PostLoad]
+	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		if ($this->parentIndex != -1 && $this->system) {
+			$systemObjects = $this->system->getObjectsByIndex();
+			$Parent = $systemObjects[$this->parentIndex];
+			$Parent->addChild($this);
+		}
+	}
+	
 	public function toJSON(bool $justArray = false): array|string {
 		$jsonArray = parent::toJSON(true);
 		
-		error_log('--% Setting object basic data for '.$this->sprite?->getName());
+		//error_log('--% Setting object basic data for '.$this->sprite?->getName());
 		$jsonArray['planet'] = $this->planet?->getName();
 		$jsonArray['distance'] = $this->distance;
 		$jsonArray['speed'] = $this->speed;
@@ -242,7 +318,7 @@ class StellarObject extends Body {
 		$jsonArray['isStation'] = $this->isStation;
 		$jsonArray['isMoon'] = $this->isMoon;
 		$jsonArray['parentIndex'] = $this->parent ? $this->parent->index : null;
-		error_log('--% Setting children for '.$this->sprite?->getName());
+		//error_log('--% Setting children for '.$this->sprite?->getName());
 		$jsonArray['children'] = [];
 		foreach ($this->children as $ChildObject) {
 			if ($ChildObject->getParent() == null || $ChildObject->getParent() == $ChildObject) {

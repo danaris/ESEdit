@@ -96,7 +96,7 @@ class SkyService {
 			}
 			$this->truncateTables(['Body', 'Color', 'ConditionSet', 'Conversation', 'ConversationElement', 'ConversationNode', 'Effect', 'EventTrigger', 'Expression', 'FlareSound', 'FlareSprite', 'GameAction', 'GameEvent', 'Government', 'GovernmentPenalty', 'JumpSound', 'LocationFilter', 'Mission', 'MissionAction', 'NPC', 'Outfit', 'OutfitAttributes', 'OutfitEffect', 'OutfitPenalty', 'Phrase', 'Planet', 'Ship', 'Sound', 'Sprite', 'SubExpression', 'System', 'SystemLink', 'TextReplacements', 'Wormhole', 'WormholeLink', 'locationfilter_government', 'locationfilter_system']);
 			if (!$loaded) {
-				$sources = ['/Users/tcollett/Development/ThirdParty/endless-sky/'];
+				$sources = [$_ENV['DATA_PATH']];
 				GameData::SetSources($sources);
 				//$this->loadImageDB();		
 				$images = GameData::FindImages();

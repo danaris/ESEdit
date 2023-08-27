@@ -823,6 +823,15 @@ class System {
 	public function getObjects(): array {
 		return $this->objects->toArray();
 	}
+	
+	public function getObjectsByIndex(): array {
+		$objectArray = [];
+		foreach ($this->objects as $Object) {
+			$objectArray[$Object->getIndex()] = $Object;
+		}
+		
+		return $objectArray;
+	}
 // 	
 	// Get the stellar object (if any) for the given planet.
 	public function findStellar(?Planet $planet): ?StellarObject {
@@ -1013,12 +1022,14 @@ class System {
 	}
 	
 	public function loadObject(DataNode $node, TemplatedArray &$planets, ?StellarObject $parent): void {
-		$this->index = count($this->objects);
+		$index = count($this->objects);
 		$object = new StellarObject();
 		$object->setSystem($this);
+		$object->setIndex($index);
 		$this->objects []= $object;
 		if ($parent) {
 			$parent->addChild($object);
+			$object->setParentIndex($parent->getIndex());
 		}
 	
 		$isAdded = ($node->getToken(0) == "add");
@@ -1188,7 +1199,7 @@ class System {
 	public function toJSON($justArray=false): string|array {
 		$jsonArray = [];
 		
-		error_log('-% Setting basic data');
+		//error_log('-% Setting basic data');
 		$jsonArray['name'] = $this->name;
 		$jsonArray['position'] = ['x'=>$this->position->X(), 'y'=>$this->position->Y()];
 		$jsonArray['government'] = $this->government ? $this->government->getTrueName() : 'Uninhabited';
@@ -1204,24 +1215,24 @@ class System {
 		$jsonArray['jumpRange'] = $this->jumpRange;
 		$jsonArray['attributes'] = $this->attributes;
 		
-		error_log('-% Setting links');
+		//error_log('-% Setting links');
 		$jsonArray['links'] = [];
 		foreach ($this->getLinks() as $ToSystem) {
 			$jsonArray['links'] []= $ToSystem->getName();
 		}
-		error_log('-% Setting objects');
+		//error_log('-% Setting objects');
 		$jsonArray['objects'] = [];
 		foreach ($this->getObjects() as $StellarObject) {
 			if (!$StellarObject->getParent()) {
 				$jsonArray['objects'] []= $StellarObject->toJSON(true);
 			}
 		}
-		error_log('-% Setting wormholes');
+		//error_log('-% Setting wormholes');
 		$jsonArray['wormholeFromLinks'] = [];
 		foreach ($this->wormholeFromLinks as $WormholeLink) {
 			$jsonArray['wormholeFromLinks'] []= ['wormhole'=>$WormholeLink->getWormhole()->getTrueName(), 'toSystem'=>$WormholeLink->getToSystem()->getName()];
 		}
-		error_log('-% Setting neighbors');
+		//error_log('-% Setting neighbors');
 		$jsonArray['neighbors'] = [];
 		foreach ($this->neighbors as $distance => $neighbors) {
 			$jsonArray['neighbors'][$distance] = [];
@@ -1229,7 +1240,7 @@ class System {
 				$jsonArray['neighbors'][$distance] []= $NeighborSystem->getName();
 			}
 		}
-		error_log('-% Returning');
+		//error_log('-% Returning');
 		
 		if ($justArray) {
 			return $jsonArray;

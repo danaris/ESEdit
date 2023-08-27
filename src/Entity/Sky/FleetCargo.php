@@ -111,35 +111,35 @@ class FleetCargo {
 	// 
 	// 
 	// 
-	// void FleetCargo::Load(const DataNode &node)
-	// {
-	// 	for(const DataNode &child : node)
-	// 		LoadSingle(child);
-	// }
-	// 
-	// 
-	// 
-	// void FleetCargo::LoadSingle(const DataNode &node)
-	// {
-	// 	if(node.Size() < 2)
-	// 		node.PrintTrace("Error: Expected key to have a value:");
-	// 	else if(node.Token(0) == "cargo")
-	// 			cargo = static_cast<int>(node.Value(1));
-	// 	else if(node.Token(0) == "commodities")
-	// 	{
-	// 		commodities.clear();
-	// 		for(int i = 1; i < node.Size(); ++i)
-	// 			commodities.push_back(node.Token(i));
-	// 	}
-	// 	else if(node.Token(0) == "outfitters")
-	// 	{
-	// 		outfitters.clear();
-	// 		for(int i = 1; i < node.Size(); ++i)
-	// 			outfitters.insert(GameData::Outfitters().Get(node.Token(i)));
-	// 	}
-	// 	else
-	// 		node.PrintTrace("Skipping unrecognized attribute:");
-	// }
+	public function load(DataNode $node): void
+	{
+		foreach ($node as $child) {
+			$this->loadSingle($child);
+		}
+	}
+	
+	
+	
+	public function loadSingle(DataNode $node): void
+	{
+		if ($node->size() < 2) {
+			$node->printTrace("Error: Expected key to have a value:");
+		} else if ($node->getToken(0) == "cargo") {
+				$this->cargo = $node->getValue(1);
+		} else if ($node->getToken(0) == "commodities") {
+			$this->commodities = [];
+			for ($i = 1; $i < $node->size(); ++$i) {
+				$this->commodities []= $node->getToken($i);
+			}
+		} else if($node->getToken(0) == "outfitters") {
+			// $this->outfitters = [];
+			// for (i = 1; i < $node->size(); ++$i) {
+			// 	$this->outfitters []= GameData::Outfitters()[$node->getToken($i)];
+			// }
+		} else {
+			$node->printTrace("Skipping unrecognized attribute:");
+		}
+	}
 	// 
 	// 
 	// 
