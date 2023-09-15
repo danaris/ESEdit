@@ -7,6 +7,7 @@ use Symfony\Component\HttpKernel\EventListener\AbstractSessionListener;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\Routing\Annotation\Route;
 use Psr\Log\LoggerInterface;
@@ -47,6 +48,7 @@ class SkyController extends AbstractController {
 	}
 	
 	#[Route('/sky', name: 'SkyEditHome')]
+	#[Route('/', name: 'SkyHome')]
 	public function index(): Response {
 		$data = [];
 		
@@ -130,8 +132,10 @@ class SkyController extends AbstractController {
 	#[Route('/sky/missions', name: 'SkyMissions')]
 	public function missions(Request $request): Response {
 		$this->loadSkyData();
+
+		$data = [];
 		
-		
+		return $this->render('sky/missions.html.twig', $data);
 	}
 	
 	#[Route('/sky/missionNames', name: 'SkyMissionNames')]
@@ -213,7 +217,7 @@ class SkyController extends AbstractController {
 		$sysQ = $this->em->createQuery('Select s from App\Entity\Sky\System s index by s.name');
 		$systems = [];
 		foreach ($sysQ->getResult() as $System) {
-			$this->logger->debug('JSONifying '.$System->getName());
+			//$this->logger->debug('JSONifying '.$System->getName());
 			$systems[$System->getName()] = $System->toJSON(true);
 		}
 		
@@ -365,7 +369,19 @@ class SkyController extends AbstractController {
 		$data = [];
 		$Ship = $this->em->getRepository(Ship::class)->find($shipId);
 		$data['Ship'] = $Ship;
+		
+		$data['source'] = ['name'=>$Ship->getSourceName(),'file'=>$Ship->getSourceFile(),'version'=>$Ship->getSourceVersion()];
 		return $this->render('sky/ship.html.twig', $data);
+	}
+	
+	#[Route('/sky/mission/{missionName}', name: 'SkyEditShip')]
+	public function mission(Request $request, string $missionName): Response {
+		$data = [];
+		$Mission = $this->em->getRepository(Mission::class)->findOneBy(['name'=>$missionName]);
+		$data['Mission'] = $Mission;
+		
+		$data['source'] = ['name'=>$Mission->getSourceName(),'file'=>$Mission->getSourceFile(),'version'=>$Mission->getSourceVersion()];
+		return $this->render('sky/mission.html.twig', $data);
 	}
 	
 	#[Route('/sky/writeShip', name: 'SkyEditWriteShip')]
@@ -451,98 +467,98 @@ class SkyController extends AbstractController {
         return $this->render('sky/galaxy.html.twig', $data);
     }
 	
-	#[Route('/sky/system/{systemName}/{startDay}', name: 'SkyEditSystem')]
-	public function system(Request $request, string $systemName, int $startDay = -1): Response {
-		$this->skyService->loadUniverse();
-		$this->skyService->loadImageDB();
+	// #[Route('/sky/system/{systemName}/{startDay}', name: 'SkyEditSystem')]
+	// public function system(Request $request, string $systemName, int $startDay = -1): Response {
+	// 	$this->skyService->loadUniverse();
+	// 	$this->skyService->loadImageDB();
 		
-		$data = array();
-		$data['systemName'] = $systemName;
-		if ($startDay == -1) {
-			$startDay = rand(1, 365 * 4);
-		}
-		$data['startDay'] = $startDay;
+	// 	$data = array();
+	// 	$data['systemName'] = $systemName;
+	// 	if ($startDay == -1) {
+	// 		$startDay = rand(1, 365 * 4);
+	// 	}
+	// 	$data['startDay'] = $startDay;
 		
-		return $this->render('sky/systemFrame.html.twig', $data);
-	}
+	// 	return $this->render('sky/systemFrame.html.twig', $data);
+	// }
 	
-	#[Route('/sky/planetInfo', name: 'SkyPlanetInfo')]
-	public function planetInfo(Request $request): Response {
-		$planetName = $request->request->get('planetName');
-		if (!$planetName) {
-			$planetName = $request->query->get('planetName');
-		}
-		$this->skyService->loadUniverse();
-		$planet = GameData::Planets()[$planetName];
-		if ($planet) {
-			$jsonArray = $planet->toJSON(true);
-		} else {
-			$jsonArray = [];
-		}
-		return $this->json(['planet'=>$jsonArray]);
-	}
+	// #[Route('/sky/planetInfo', name: 'SkyPlanetInfo')]
+	// public function planetInfo(Request $request): Response {
+	// 	$planetName = $request->request->get('planetName');
+	// 	if (!$planetName) {
+	// 		$planetName = $request->query->get('planetName');
+	// 	}
+	// 	$this->skyService->loadUniverse();
+	// 	$planet = GameData::Planets()[$planetName];
+	// 	if ($planet) {
+	// 		$jsonArray = $planet->toJSON(true);
+	// 	} else {
+	// 		$jsonArray = [];
+	// 	}
+	// 	return $this->json(['planet'=>$jsonArray]);
+	// }
 	
-	#[Route('/sky/loadtest', name: "LoadTest")]
-	public function loadTest(Request $request): Response {
-		GameData::Init();
-		GameData::Objects()->load(['/Users/tcollett/Development/ThirdParty/endless-sky/'], true);
-		//$file = new DataFile('/Users/tcollett/Development/ThirdParty/endless-sky/data/human/deep missions.txt');
+	// #[Route('/sky/loadtest', name: "LoadTest")]
+	// public function loadTest(Request $request): Response {
+	// 	GameData::Init();
+	// 	GameData::Objects()->load([$_ENV['DATA_PATH']], true);
+	// 	//$file = new DataFile('/Users/tcollett/Development/ThirdParty/endless-sky/data/human/deep missions.txt');
 		
-		//$testMission = new Mission();
+	// 	//$testMission = new Mission();
 		
-		$out = '';
+	// 	$out = '';
 		
-		$writer = new DataWriter();
+	// 	$writer = new DataWriter();
 		
-		$test = GameData::Missions()["Deep: Syndicate Convoy"];
-		$test->save($writer, 'test');
+	// 	$test = GameData::Missions()["Deep: Syndicate Convoy"];
+	// 	$test->save($writer, 'test');
 		
-		$out = $test->getName()."\n".$writer->getString();
+	// 	$out = $test->getName()."\n".$writer->getString();
 		
-		$response = new Response($out);
-		$response->headers->set('Content-Type','text/plain');
-		return $response;
-	}
+	// 	$response = new Response($out);
+	// 	$response->headers->set('Content-Type','text/plain');
+	// 	return $response;
+	// }
 	
-	#[Route('/sky/missiontest', name: "MissionTest")]
-	public function missionTest(Request $request): Response {
-		$this->skyService->loadUniverse();
+	// #[Route('/sky/missiontest', name: "MissionTest")]
+	// public function missionTest(Request $request): Response {
+	// 	$this->skyService->loadUniverse();
 		
-		$data = array();
-		$missions = GameData::Missions();
-		$data['missions'] = $missions;
+	// 	$data = array();
+	// 	$missions = GameData::Missions();
+	// 	$data['missions'] = $missions;
 		
-		// $prerequisites = array();
-		// $reversePrerequisites = array();
-		// $missionNames = array_keys($missions->getContents());
-		// $missionsDone = array_map(function($missionName) {
-		// 	return $missionName . ': done';
-		// }, $missionNames);
-		// $doneLength = strlen(': done');
-		// foreach ($missions as $missionName => $mission) {
-		// 	foreach ($mission->getToOffer()->getExpressions() as $toOfferExpression) {
-		// 		foreach ($toOfferExpression->getLeft()->getTokens() as $leftToken) {
-		// 			if (in_array($leftToken, $missionsDone) && $toOfferExpression->getOp() == '!=' && $toOfferExpression->getRight()->getTokens()[0] == '0') {
-		// 				$prereqName = substr($leftToken, 0, strlen($leftToken) - $doneLength);
-		// 				error_log('Mission '.$prereqName.' is a prerequisite of '.$missionName);
-		// 				if (!isset($prerequisites[$missionName])) {
-		// 					$prerequisites[$missionName] = array();
-		// 				}
-		// 				$prerequisites[$missionName] []= $missions[$prereqName];
-		// 				if (!isset($reversePrerequisites[$prereqName])) {
-		// 					$reversePrerequisites[$prereqName] = array();
-		// 				}
-		// 				$reversePrerequisites[$prereqName] []= $mission;
-		// 			} else {
-		// 				error_log('Got a non-prereq toOffer: '.$toOfferExpression->getLeft()->getTokens()[0].' '.$toOfferExpression->getOp().' '.$toOfferExpression->getRight()->getTokens()[0]);
-		// 			}
-		// 		}
-		// 	}
-		// }
-		// 
-		// $data['prerequisites'] = $prerequisites;
-		// $data['revPrerequisites'] = $reversePrerequisites;
+	// 	// $prerequisites = array();
+	// 	// $reversePrerequisites = array();
+	// 	// $missionNames = array_keys($missions->getContents());
+	// 	// $missionsDone = array_map(function($missionName) {
+	// 	// 	return $missionName . ': done';
+	// 	// }, $missionNames);
+	// 	// $doneLength = strlen(': done');
+	// 	// foreach ($missions as $missionName => $mission) {
+	// 	// 	foreach ($mission->getToOffer()->getExpressions() as $toOfferExpression) {
+	// 	// 		foreach ($toOfferExpression->getLeft()->getTokens() as $leftToken) {
+	// 	// 			if (in_array($leftToken, $missionsDone) && $toOfferExpression->getOp() == '!=' && $toOfferExpression->getRight()->getTokens()[0] == '0') {
+	// 	// 				$prereqName = substr($leftToken, 0, strlen($leftToken) - $doneLength);
+	// 	// 				error_log('Mission '.$prereqName.' is a prerequisite of '.$missionName);
+	// 	// 				if (!isset($prerequisites[$missionName])) {
+	// 	// 					$prerequisites[$missionName] = array();
+	// 	// 				}
+	// 	// 				$prerequisites[$missionName] []= $missions[$prereqName];
+	// 	// 				if (!isset($reversePrerequisites[$prereqName])) {
+	// 	// 					$reversePrerequisites[$prereqName] = array();
+	// 	// 				}
+	// 	// 				$reversePrerequisites[$prereqName] []= $mission;
+	// 	// 			} else {
+	// 	// 				error_log('Got a non-prereq toOffer: '.$toOfferExpression->getLeft()->getTokens()[0].' '.$toOfferExpression->getOp().' '.$toOfferExpression->getRight()->getTokens()[0]);
+	// 	// 			}
+	// 	// 		}
+	// 	// 	}
+	// 	// }
+	// 	// 
+	// 	// $data['prerequisites'] = $prerequisites;
+	// 	// $data['revPrerequisites'] = $reversePrerequisites;
 		
-		return $this->render('sky/missiontest.html.twig', $data);
-	}
+	// 	return $this->render('sky/missiontest.html.twig', $data);
+	// }
 }

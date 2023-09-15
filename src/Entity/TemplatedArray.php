@@ -22,6 +22,10 @@ class TemplatedArray implements \Iterator, \ArrayAccess, \Countable {
 		return $this->contents;
 	}
 	
+	public function getType(): string {
+		return $this->type;
+	}
+	
 	public function setEM(EntityManagerInterface $em) {
 		$this->em = $em;
 	}
@@ -52,6 +56,8 @@ class TemplatedArray implements \Iterator, \ArrayAccess, \Countable {
 			$this->contents[$offset] = new $this->type();
 			if ($this->em) {
 				$this->em->persist($this->contents[$offset]);
+			} else {
+				error_log('TA ERROR: Templated array asked to create a new '.$this->type.' ('.$offset.') without an EM!!');
 			}
 		}
 		return $this->contents[$offset];

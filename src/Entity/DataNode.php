@@ -2,23 +2,66 @@
 
 namespace App\Entity;
 
+use App\Entity\Sky\GameEvent;
+use Doctrine\ORM\Mapping as ORM;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Event\PostLoadEventArgs;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+
+
+#[ORM\Entity]
+#[ORM\Table(name: 'DataNode')]
+#[ORM\HasLifecycleCallbacks]
 class DataNode implements \Iterator, \ArrayAccess, \Countable {
+	#[ORM\Id]
+	#[ORM\GeneratedValue]
+	#[ORM\Column(type: 'integer')]
+	private int $id;
 	
 	// These are "child" nodes found on subsequent lines with deeper indentation.
-	protected array $children = []; // DataNode array
+	#[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent', cascade: ['persist'])]
+	protected Collection $children; // DataNode array
 	// These are the tokens found in this particular line of the data file.
+	#[ORM\Column(type: Types::TEXT)]
+	protected string $tokensStr = '';
 	protected array $tokens = []; // string array
 	// The parent pointer is used only for printing stack traces.
+	#[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children', cascade: ['persist'])]
 	protected ?DataNode $parent = null;
 	// The line number in the given file that produced this node.
+	#[ORM\Column(type: 'integer')]
 	protected int $lineNumber = 0;
+	
+	#[ORM\Column(type: 'boolean')]
+	protected bool $isChanges = false;
 	
 	private int $iterIndex = 0;
 	
-	public string $fromFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
+
+    #[ORM\ManyToOne(inversedBy: 'changes')]
+    private ?GameEvent $changeEvent = null;
+	
+	#[ORM\PreFlush]
+	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		$this->tokensStr = json_encode($this->tokens);
+	}
+	
+	#[ORM\PostLoad]
+	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		$this->tokens = json_decode($this->tokensStr, true);
+	}
 	
 	// Construct a DataNode and remember what its parent is.
-	public function __construct(DataNode $parent = null, DataNode $other = null, ?string $fromFile = null) {
+	public function __construct(DataNode $parent = null, DataNode $other = null, ?array $source = null) {
+		$this->children = new ArrayCollection();
 		if ($parent) {
 			$this->parent = $parent;
 		}
@@ -28,8 +71,12 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 			$this->lineNumber = $other->lineNumber;
 			$this->reparent();
 		}
-		if ($fromFile) {
-			$this->fromFile = $fromFile;
+		if ($source) {
+			$this->sourceName = $source['name'];
+			$this->sourceFile = $source['file'];
+			if (isset($source['version'])) {
+				$this->sourceVersion = $source['version'];
+			}
 		}
 	}
 	
@@ -48,6 +95,40 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 	public function getToken(int $index): string {
 		return $this->tokens[$index];
 	}
+	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
+	public function setIsChanges(bool $changes, bool $recurse=false): void {
+		$this->isChanges = $changes;
+		if ($recurse) {
+			foreach ($this->children as $Child) {
+				$Child->setIsChanges($changes, true);
+			}
+		}
+	}
+
 	
 	// Convert the token with the given index to a numerical value.
 	public function getValue(int $index): float {
@@ -204,7 +285,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 	}
 	
 	public function current(): DataNode {
-		return $this->children[array_keys($this->children)[$this->iterIndex]];
+		return $this->children[$this->children->getKeys()[$this->iterIndex]];
 	}
 	
 	public function key(): scalar {
@@ -244,10 +325,10 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		if ($this->iterIndex < 0) {
 			return false;
 		}
-		if (!isset(array_keys($this->children)[$this->iterIndex])) {
+		if (!isset($this->children->getKeys()[$this->iterIndex])) {
 			return false;
 		}
-		$childKey = array_keys($this->children)[$this->iterIndex];
+		$childKey = $this->children->getKeys()[$this->iterIndex];
 		if (isset($this->children[$childKey])) {
 			return true;
 		}
@@ -305,5 +386,17 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 			$child->reparent();
 		}
 	}
+
+    public function getChangeEvent(): ?GameEvent
+    {
+        return $this->changeEvent;
+    }
+
+    public function setChangeEvent(?GameEvent $changeEvent): static
+    {
+        $this->changeEvent = $changeEvent;
+
+        return $this;
+    }
 
 }

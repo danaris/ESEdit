@@ -7,17 +7,22 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Event\PostLoadEventArgs;
+use ApiPlatform\Metadata\ApiResource;
 
 use App\Entity\DataNode;
 
+/**
+ * A planet, star, moon, or station within a system
+ */
 #[ORM\Entity]
 #[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'StellarObject')]
+#[ApiResource]
 class StellarObject extends Body {
-	#[ORM\Id]
-	#[ORM\GeneratedValue]
-	#[ORM\Column(type: 'integer')]
-	public int $id;
+	// #[ORM\Id]
+	// #[ORM\GeneratedValue]
+	// #[ORM\Column(type: 'integer')]
+	// public int $id;
 	
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Planet')]
 	#[ORM\JoinColumn(nullable: true, name: 'planetId')]
@@ -47,7 +52,7 @@ class StellarObject extends Body {
 
     private ?self $parent = null;
 
-    private array $children = [];
+    private ?array $children = null;
 	
 	#[ORM\ManyToOne(targetEntity: System::class, inversedBy: 'objects')]
 	private ?System $system = null;
@@ -252,18 +257,37 @@ class StellarObject extends Body {
 		$this->parentIndex = $parentIndex;
 	}
 
-    /**
-     * @return Collection<int, self>
-     */
-    public function getChildren(): array
-    {
+    public function getChildren(): array {
+		if ($this->children == null) {
+			$this->initChildren();
+		}
         return $this->children;
     }
 
-    public function addChild(self $child): self
-    {
+	private function initChildren(): void {
+		if ($this->children) {
+			return;
+		}
+		if ($this->system) {
+			$systemObjects = $this->system->getObjectsByIndex();
+			foreach ($systemObjects as $index => $Object) {
+				if ($Object->parentIndex != -1) {
+					$Parent = $systemObjects[$Object->parentIndex];
+					$Parent->addChild($Object);
+				}
+				if ($Object->children == null) {
+					$Object->children = [];
+				}
+			}
+		}
+	}
+
+    public function addChild(self $child): self {
+		if (!$this->children) {
+			$this->children = [];
+		}
         if (!in_array($child, $this->children)) {
-			error_log("%- Adding ".$child->sprite?->getName().' as child of '.$this->sprite?->getName());
+			//error_log("%- Adding ".$child->sprite?->getName().' as child of '.$this->sprite?->getName());
             $this->children []= $child;
             $child->setParent($this);
         }
@@ -286,24 +310,28 @@ class StellarObject extends Body {
 	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		parent::toDatabase($eventArgs);
 		if ($this->parent && $this->parent->index != $this->parentIndex) {
 			$this->parentIndex = $this->parent->index;
 		}
-		foreach ($this->children as $ChildObject) {
-			if ($ChildObject->parentIndex != $this->index) {
-				$ChildObject->parentIndex = $this->index;
+		if ($this->children) {
+			foreach ($this->children as $ChildObject) {
+				if ($ChildObject->parentIndex != $this->index) {
+					$ChildObject->parentIndex = $this->index;
+				}
 			}
 		}
 	}
 	
-	#[ORM\PostLoad]
-	public function fromDatabase(PostLoadEventArgs $eventArgs) {
-		if ($this->parentIndex != -1 && $this->system) {
-			$systemObjects = $this->system->getObjectsByIndex();
-			$Parent = $systemObjects[$this->parentIndex];
-			$Parent->addChild($this);
-		}
-	}
+	// #[ORM\PostLoad]
+	// public function fromDatabase(PostLoadEventArgs $eventArgs) {
+	//	parent::fromDatabase($eventArgs);
+	// 	if ($this->parentIndex != -1 && $this->system) {
+	// 		$systemObjects = $this->system->getObjectsByIndex();
+	// 		$Parent = $systemObjects[$this->parentIndex];
+	// 		$Parent->addChild($this);
+	// 	}
+	// }
 	
 	public function toJSON(bool $justArray = false): array|string {
 		$jsonArray = parent::toJSON(true);
@@ -320,6 +348,9 @@ class StellarObject extends Body {
 		$jsonArray['parentIndex'] = $this->parent ? $this->parent->index : null;
 		//error_log('--% Setting children for '.$this->sprite?->getName());
 		$jsonArray['children'] = [];
+		if ($this->children == null) {
+			$this->initChildren();
+		}
 		foreach ($this->children as $ChildObject) {
 			if ($ChildObject->getParent() == null || $ChildObject->getParent() == $ChildObject) {
 				continue;

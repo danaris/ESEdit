@@ -5,9 +5,18 @@
 	font-style: normal;
 }
 
+:root {
+	--bright: rgb(192, 192, 192);
+	--medium: rgb(128, 128, 128);
+	--dim: rgb(64, 64, 64);
+	--dimmer: rgb(46, 46, 46);
+	--faint: rgb(26, 26, 26);
+	--dark: rgb(13, 13, 13);
+}
+
 body {
-	background-color: rgb(40,40,40);
-	color: rgb(190,190,190);
+	background-color: var(--dimmer);
+	color: var(--bright);
 	font-family: Ubuntu, sans-serif;
 }
 .debug {
@@ -27,6 +36,11 @@ a:link:active, a:active {
 }
 a:link:visited, a:visited {
 	color: lightblue;
+}
+skySpoilerSwitch {
+  display: inline-block;
+  position: relative;
+  top: 3px;
 }
 
 #skyLogo {
@@ -52,7 +66,7 @@ a:link:visited, a:visited {
 	margin: 0;
 	height: 28px;
 	padding: 0;
-	background: #006;
+	background: var(--dark);
 	z-index: 9;
 	position: fixed;
 	top: 0px;
@@ -66,18 +80,8 @@ a:link:visited, a:visited {
 	padding: 0;
 	height: 100%;
 }
-#skyCacheButtons {
+#skySpoilerSwitch {
 	justify-self: end;
-}
-#skyCacheButtons button {
-	background-color: red;
-}
-#skyAddPluginDialog {
-	display: none;
-}
-#skyPluginFieldset {
-	display: grid;
-	grid-template-columns: 6em auto;
 }
 
 #skyTop ul li {
@@ -163,4 +167,32 @@ a:link:visited, a:visited {
 }
 .unlockedMissions .missionChain {
 	margin: 0.5em;
+}
+
+.conversationHeader {
+	
+}
+.conversationText {
+	font-family: monospace;
+}
+.conversationNode {
+	display: grid;
+	grid-template-columns: 8rem auto;
+	border: 3px var(--medium) ridge;
+	background-color: var(--dim);
+}
+.conversationNodeLabel {
+	grid-row-start: span 2;
+}
+.conversationElementText {
+	background-color: var(--dimmer);
+}
+.conversationNodeElement {
+	border: 3px var(--medium) groove;
+}
+.conversationElementConditions {
+	border: 2px var(--dark) groove;
+}
+.conversationElementNext {
+	border: 2px var(--dark) groove;
 }

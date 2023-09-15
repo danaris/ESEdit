@@ -1,0 +1,10 @@
+var shipyards = {};
+var outfitters = {};
+{% for sale in sales %}
+	{% if sale.type == 'App\Entity\Sky\Ship' %}
+		{% set saleType = 'shipyards' %}
+	{% else %}
+		{% set saleType = 'outfitters' %}
+	{% endif %}
+	{% include 'sky/data/sale.js.twig' %}
+{% endfor %}

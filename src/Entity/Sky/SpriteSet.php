@@ -22,7 +22,7 @@ class SpriteSet {
 		if (!isset(self::$sprites)) {
 			self::Init();
 		}
-		foreach ($this->sprites as $spriteName => $sprite) {
+		foreach (self::$sprites as $spriteName => $sprite) {
 			if ($sprite->getHeight() == 0 && $sprite->getWidth() == 0) {
 				// Landscapes are allowed to still be empty.
 				if (substr($spriteName, 0, 5) == "land/") {
@@ -44,10 +44,12 @@ class SpriteSet {
 				$sprite->setWidth($ImageSet->getWidth());
 				$sprite->setHeight($ImageSet->getHeight());
 				$sprite->setFrames($ImageSet->getFrameCount());
+				$sprite->setSource($ImageSet->getSource());
 				for ($i=0; $i<$ImageSet->getFrameCount(); $i++) {
 					$SpritePath = new SpritePath();
 					$SpritePath->setSprite($sprite);
 					$SpritePath->setPathIndex($i);
+					//error_log('Creating sprite '.$name.' path '.$i.' "'.$ImageSet->getFramePath($i).'"');
 					$SpritePath->setPath($ImageSet->getFramePath($i));
 					$SpritePath->setIs2x(false);
 					$sprite->getFramePaths() []= $SpritePath;

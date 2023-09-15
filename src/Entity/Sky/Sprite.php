@@ -7,12 +7,14 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 use Doctrine\ORM\Mapping as ORM;
+use ApiPlatform\Metadata\ApiResource;
 
 use App\Entity\DataNode;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'Sprite')]
 #[ORM\HasLifecycleCallbacks]
+#[ApiResource]
 class Sprite {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -33,6 +35,13 @@ class Sprite {
     #[ORM\OneToMany(mappedBy: 'sprite', targetEntity: SpritePath::class, orphanRemoval: true, cascade: ['persist'])]
     private Collection $framePaths;
 	private array $paths = [];
+	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
 	
 	public function __construct(string $name) {
 		$this->name = $name;
@@ -90,6 +99,40 @@ class Sprite {
 		return new Point(.5 * $this->width, .5 * $this->height);
 	}
 	
+	public function getSource(): array {
+		return ['name'=>$this->sourceName, 'file'=>$this->sourceFile, 'version'=>$this->sourceVersion];
+	}
+	public function setSource(array $source): self {
+		$this->sourceName = $source['name'];
+		$this->sourceFile = $source['file'];
+		$this->sourceVersion = $source['version'];
+		return $this;
+	}
+	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+
 	public function __toString() {
 		return $this->name;
 	}
@@ -100,6 +143,9 @@ class Sprite {
 		$jsonArray['width'] = $this->width;
 		$jsonArray['height'] = $this->height;
 		$jsonArray['frames'] = $this->frames;
+		$jsonArray['paths'] = $this->paths;
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
 		
 		if ($justArray) {
 			return $jsonArray;
@@ -143,7 +189,7 @@ class Sprite {
 		$handledPaths = [];
 		foreach ($this->framePaths as $SpritePath) {
 			if (!isset($this->paths[$SpritePath->getPathIndex()])) {
-				$eventArgs->getEntityManager()->remove($SpritePath);
+				$eventArgs->getObjectManager()->remove($SpritePath);
 			} else if ($this->paths[$SpritePath->getPathIndex()] == $SpritePath->getPath()) {
 				$handledPaths []= $SpritePath->getPathIndex();
 			} else {
@@ -157,9 +203,10 @@ class Sprite {
 			$SpritePath = new SpritePath();
 			$SpritePath->setSprite($this);
 			$SpritePath->setPathIndex($pathIndex);
+			error_log('Sprite '.$this->name.' path '.$pathIndex.'" '.$pathString);
 			$SpritePath->setPath($pathString);
 			$SpritePath->setIs2x(false);
-			$this->framePath []= $SpritePath;
+			$this->framePaths []= $SpritePath;
 		}
 	}
 	

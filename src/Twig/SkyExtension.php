@@ -58,6 +58,7 @@ class SkyExtension extends AbstractExtension {
 		$functions []= new TwigFunction('createLabel', [$this, 'createLabel']);
 		$functions []= new TwigFunction('esToSvg', [$this, 'esToSvg']);
 		$functions []= new TwigFunction('writeObject', [$this, 'writeObject']);
+		$functions []= new TwigFunction('spritePath', [$this, 'spritePath']);
 		
 		return $functions;
 	}
@@ -140,6 +141,18 @@ class SkyExtension extends AbstractExtension {
 		// }
 		// return [];
 		return SpriteSet::Get($imageName);
+	}
+	
+	public function spritePath(Sprite $Sprite, int $frameIndex=0): string {
+		$framePaths = $Sprite->getFramePaths();
+		if (isset($framePaths[$frameIndex])) {
+			$SpritePath = $framePaths[$frameIndex];
+			$imagePath = $SpritePath->getPath();
+		} else {
+			$imagePath = 'outfits/unknown.png';
+		}
+		
+		return '/skyImages/'.$imagePath;
 	}
 	
 	public function esToSvg(SkyPoint $point, float $size): SkyPoint {

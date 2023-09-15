@@ -44,6 +44,9 @@ class UniverseObjects {
 	public array $neighborDistances = [];
 	
 	private float $progress;
+
+	private array $helpMessages = [];
+	private array $tooltips = [];
 	
 	// TGC added
 	private array $nodesByType = [];
@@ -105,35 +108,33 @@ class UniverseObjects {
 			$this->em = $em;
 		}
 
-		$files = [];
+		$fileSources = [];
 		foreach ($sources as $source) {
 			// Iterate through the paths starting with the last directory given. That
 			// is, things in folders near the start of the path have the ability to
 			// override things in folders later in the path.
-			$list = $this->dirList($source . 'data/');
+			$list = $this->dirList($source['dir'] . 'data/');
 			for ($i = count($list) - 1; $i >= 0; $i--) {
-				$files []= $list[$i];
+				$fileSources []= ['name'=>$source['name'], 'file'=>$list[$i], 'version'=>$source['version']];
 			}
 		}
 
-		foreach ($files as $path) {
-			$this->loadFile($path, $debugMode);
+		foreach ($fileSources as $sourceInfo) {
+			$this->loadFile($sourceInfo, $debugMode);
 		}
 		$this->loadObjects();
 		$this->finishLoading();
 	}
 	
-	
-	
-	public function loadFile(string $path, bool $debugMode) {
+	public function loadFile(array $sourceInfo, bool $debugMode) {
 		// This is an ordinary file. Check to see if it is an image.
-		if (strlen($path) < 4 || substr($path, -4) != '.txt') {
+		if (strlen($sourceInfo['file']) < 4 || substr($sourceInfo['file'], -4) != '.txt') {
 			return;
 		}
 	
-		$data = new DataFile($path);
+		$data = new DataFile($sourceInfo);
 		if ($debugMode) {
-			error_log("Parsing: " . $path);
+			error_log("Parsing: " . $sourceInfo['file']);
 		}
 		
 		foreach ($data as $node) {
@@ -150,7 +151,7 @@ class UniverseObjects {
 		$categoryTypes = ['ship', 'bay type', 'outfit', 'series'];
 		$canDisable = ["mission", "event", "person"];
 		
-		$typeOrder = ['color','effect','outfit','ship','trade','government','planet','wormhole','system','event'];
+		$typeOrder = ['color','effect','outfit','ship','trade','government','planet','wormhole','system','event','mission'];
 		
 		foreach ($this->nodesByType as $key => $nodes) {
 			if (!in_array($key, $typeOrder)) {
@@ -160,7 +161,7 @@ class UniverseObjects {
 		
 		foreach ($typeOrder as $key) {
 			$nodes = $this->nodesByType[$key];
-			error_log('Now loading in '.$key.' objects...');
+			//error_log('Now loading in '.$key.' objects...');
 			
 			foreach ($nodes as $node) {
 				if ($node->size() > 1) {
@@ -168,7 +169,7 @@ class UniverseObjects {
 				} else {
 					$nodeName = '(unnamed '.$key.')';
 				}
-				error_log('...node with name '.$nodeName);
+				//error_log('...node with name '.$nodeName);
 				if ($key == "color" && $node->size() >= 5) {
 					$this->colors[$node->getToken(1)]->load($node->getValue(2), $node->getValue(3), $node->getValue(4), $node->size() >= 6 ? $node->getValue(5) : 1.);
 					$this->colors[$node->getToken(1)]->name = $node->getToken(1);
@@ -201,9 +202,7 @@ class UniverseObjects {
 				} else if ($key == "outfit" && $node->size() >= 2) {
 					$this->outfits[$node->getToken(1)]->load($node);
 				} else if ($key == "outfitter" && $node->size() >= 2) {
-					// $outfitSale = new OutfitSale();
-					// $outfitSale->load($node, $outfits);
-					// $this->outfitSales[$node->getToken(1)] = $outfitSale;
+					$this->outfitSales[$node->getToken(1)]->load($node, $this->outfits);
 				} else if ($key == "person" && $node->size() >= 2) {
 					// $person = new Person();
 					// $person->load($node);
@@ -217,9 +216,7 @@ class UniverseObjects {
 					$name = $node->getToken(($node->size() > 2) ? 2 : 1);
 					$this->ships[$name]->load($node);
 				} else if ($key == "shipyard" && $node->size() >= 2) {
-					// $sale = new ShipSale();
-					// $sale->load($node, $ships);
-					// $this->shipSales[$node.getToken(1)] = $sale;
+					$this->shipSales[$node->getToken(1)]->load($node, $this->ships);
 				} else if ($key == "system" && $node->size() >= 2) {
 					$this->systems[$node->getToken(1)]->load($node, $this->planets);
 				} else if($key == "trade") {
@@ -233,6 +230,25 @@ class UniverseObjects {
 					// 	continue;
 					// }
 					// $this->categories[$categoryName]->load($node);
+				} else if (($key == "tip" || $key == "help") && $node->Size() >= 2) {
+					$text = $key == "tip" ? 'tooltips' : 'helpMessages';
+					$name = $node->getToken(1);
+					$this->$text[$name] = '';
+					foreach ($node as $child) {
+						if ($this->$text[$name] != '') {
+							$this->$text[$name] .= "\n";
+							$word = $child->getToken(0);
+							if (strlen($word) > 0 && $word[0] != '	') {
+								$this->$text[$name] .= '	';
+							}
+						}
+						$this->$text[$name] .= $child->getToken(0);
+					}
+				//}
+				// else if(key == "substitutions" && node.HasChildren())
+				// 	substitutions.Load(node);
+				// else if(key == "gamerules" && node.HasChildren())
+				// 	gamerules.Load(node);
 				} else if ($key == "wormhole" && $node->size() >= 2) {
 					error_log('Loading wormhole with name '.$node->getToken(1));
 					$this->wormholes[$node->getToken(1)]->load($node);
@@ -285,6 +301,16 @@ class UniverseObjects {
 		// foreach ($this->minables as $minable) {
 		// 	$minable->finishLoading();
 		// }
+		
+		// Make sure all mission NPCs have their missions correctly set
+		foreach ($this->missions as $Mission) {
+			foreach ($Mission->getNPCs() as $NPC) {
+				if ($NPC->getMission() == null) {
+					error_log('NPC for mission "'.$Mission->getTrueName().'" was incorrectly set; fixing');
+					$NPC->setMission($Mission);
+				}
+			}
+		}
 	
 		foreach ($this->startConditions as $cond) {
 			$cond->finishLoading();
@@ -391,7 +417,7 @@ class UniverseObjects {
 							} else if ($toOfferExpression->getOp() == '==' && $toOfferExpression->getRight()->getTokens()[0] == '0') {
 								$mission->isBlockedBy[$leftToken] = ['type'=>'attribute', 'name'=>$leftToken];
 							} else {
-								$mission->isUnlockedBy[$eventName] = ['type'=>'attribute','name'=>$leftToken, 'on' => $toOfferExpression->getOp().' '.$toOfferExpression->getRight()->getTokens()[0]];
+								$mission->isUnlockedBy[$leftToken] = ['type'=>'attribute','name'=>$leftToken, 'on' => $toOfferExpression->getOp().' '.$toOfferExpression->getRight()->getTokens()[0]];
 							}
 						}
 					}

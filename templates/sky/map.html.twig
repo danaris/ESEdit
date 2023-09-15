@@ -37,6 +37,13 @@
 	stroke: lightgray;
 	stroke-opacity: 0.7;
 }
+.hasAttribute {
+	stroke-width: 2px;
+	stroke: rgb(102,102,204);
+}
+.controlsAttribute {
+	cursor: pointer;
+}
 </style>{% endblock %}
 
 {% block content %}
@@ -84,9 +91,15 @@ function angleBetween(fromPoint, toPoint) {
 	
 	return angleDeg;
 }
+var spoilerFreeGovernments = ['Republic','Syndicate','Pirate','Free Worlds'];
 $(function() {
 	for (var systemName in systems) {
 		var system = systems[systemName];
+		if (spoilerFree) {
+			if (!spoilerFreeGovernments.includes(system.government)) {
+				continue;
+			}
+		}
 		var sysStatus = 'unoccupied';
 		if (system.government != 'Uninhabited' && system.inhabited) {
 			sysStatus = 'occupied';
@@ -124,37 +137,39 @@ $(function() {
 		$("#systemNames").append(systemNameSVG);
 		$("#systemLinks").append(systemLinksSVG);
 	}
-	for (var wormholeName in wormholes) {
-		var wormhole = wormholes[wormholeName];
-		
-		for (var fromName in wormhole.links) {
-			var fromSystem = systems[fromName];
-			var inactiveFrom = (fromSystem.hidden || fromSystem.inaccessible);
+	if (!spoilerFree) {
+		for (var wormholeName in wormholes) {
+			var wormhole = wormholes[wormholeName];
 			
-			var toName = wormhole.links[fromName];
-			var toSystem = systems[toName];
-			
-			var inactiveTo = (toSystem.hidden || toSystem.inaccessible);
-			
-			var wormholeColor = colors['map wormhole'];
-			if (wormhole.linkColor) {
-				wormholeColor = wormhole.linkColor;
+			for (var fromName in wormhole.links) {
+				var fromSystem = systems[fromName];
+				var inactiveFrom = (fromSystem.hidden || fromSystem.inaccessible);
+				
+				var toName = wormhole.links[fromName];
+				var toSystem = systems[toName];
+				
+				var inactiveTo = (toSystem.hidden || toSystem.inaccessible);
+				
+				var wormholeColor = colors['map wormhole'];
+				if (wormhole.linkColor) {
+					wormholeColor = wormhole.linkColor;
+				}
+				wormholeColor = cssColor(wormholeColor);
+				
+				var angle = angleBetween(fromSystem.position, toSystem.position);
+				
+				var wormholeSVG = '<line class="wormhole" id="'+nameEsc(fromName)+'-'+nameEsc(toName)+'-hole" x1="'+(2048 + fromSystem.position.x)+'" y1="'+(2048 + fromSystem.position.y)+'" x2="'+(2048 + toSystem.position.x)+'" y2="'+(2048 + toSystem.position.y)+'" stroke="'+wormholeColor+'" ';
+				if (inactiveFrom || inactiveTo) {
+					wormholeSVG += 'stroke-opacity="0.3"';
+				} else {
+					wormholeSVG += 'stroke-opacity="0.7"';
+				}
+				wormholeSVG += ' style="stroke-width: 2px;"></line>';
+				
+				wormholeSVG += '<use class="wormhole" x="'+(2048 + fromSystem.position.x)+'" y="'+(2048 + fromSystem.position.y)+'" href="#revArrow" stroke-width="2" stroke="'+wormholeColor+'" transform="rotate('+angle+' '+(2048 + fromSystem.position.x)+' '+(2048 + fromSystem.position.y)+')" />';
+				
+				$("#wormholes").append(wormholeSVG);
 			}
-			wormholeColor = cssColor(wormholeColor);
-			
-			var angle = angleBetween(fromSystem.position, toSystem.position);
-			
-			var wormholeSVG = '<line class="wormhole" id="'+nameEsc(fromName)+'-'+nameEsc(toName)+'-hole" x1="'+(2048 + fromSystem.position.x)+'" y1="'+(2048 + fromSystem.position.y)+'" x2="'+(2048 + toSystem.position.x)+'" y2="'+(2048 + toSystem.position.y)+'" stroke="'+wormholeColor+'" ';
-			if (inactiveFrom || inactiveTo) {
-				wormholeSVG += 'stroke-opacity="0.3"';
-			} else {
-				wormholeSVG += 'stroke-opacity="0.7"';
-			}
-			wormholeSVG += ' style="stroke-width: 2px;"></line>';
-			
-			wormholeSVG += '<use class="wormhole" x="'+(2048 + fromSystem.position.x)+'" y="'+(2048 + fromSystem.position.y)+'" href="#revArrow" stroke-width="2" stroke="'+wormholeColor+'" transform="rotate('+angle+' '+(2048 + fromSystem.position.x)+' '+(2048 + fromSystem.position.y)+')" />';
-			
-			$("#wormholes").append(wormholeSVG);
 		}
 	}
 	
@@ -199,7 +214,7 @@ $(function() {
 			<!-- Galaxy sprite: {{ galaxyName }} = {{ galaxy.sprite }} -->
 			{% if galaxy.sprite %}
 				<!-- Galaxy sprite valid -->
-			<image id="{{ galaxy.name }}-sprite" xlink:href="{{ path('SkyImagePath', {spriteId: galaxy.sprite.id}) }}" x="{{ 2048 + galaxy.position.x - (galaxy.sprite.width/2) }}" y="{{ 2048 + galaxy.position.y - (galaxy.sprite.height/2) }}" />
+			<image id="{{ galaxy.name }}-sprite" xlink:href="{{ spritePath(galaxy.sprite) }}" x="{{ 2048 + galaxy.position.x - (galaxy.sprite.width/2) }}" y="{{ 2048 + galaxy.position.y - (galaxy.sprite.height/2) }}" />
 			{% endif %}
 		{% endfor %}
 	</g>
@@ -243,14 +258,43 @@ $(function() {
 
 <div id="systemDialog" title="System View">
 </div>
+
+<div id="mapControls" title="Controls">
+	<details>
+		<summary>Attributes</summary>
+		<ul id="controlsAttributes">
+		</ul>
+	</details>
+</div>
 {% endblock %}
 
 {% block lateScripts %}
 <script>
+var allAttributes = [];
 function showSystem(systemName) {
 	$("#systemDialog").html('');
 	$("#systemDetails-"+systemName).appendTo("#systemDialog");
 	$("#systemDialog").dialog("open");
+}
+function highlightAttribute(attributeName) {
+	for (var systemName in systems) {
+		var system = systems[systemName];
+		var hasAttribute = false;
+		for (var j=0; j<system.attributes.length; j++) {
+			if (system.attributes[j] == attributeName) {
+				hasAttribute = true;
+				break;
+			}
+		}
+		if (hasAttribute) {
+			$("#"+nameEsc(system.name)+'-systemName').addClass('hasAttribute');
+		} else {
+			$("#"+nameEsc(system.name)+'-systemName').removeClass('hasAttribute');
+		}
+	}
+	
+	$(".controlsAttribute").css('font-weight','');
+	$("#controlsAttribute"+nameEsc(attributeName)).css('font-weight','bold');
 }
 $(function() {
 	$("#systemDialog").dialog({
@@ -260,6 +304,29 @@ $(function() {
 		  modal: true,
 		  close: function() {
 			  $("#systemDialog").dialog('close');
+		  }
+		});
+	for (var systemName in systems) {
+		var system = systems[systemName];
+		for (var j=0; j<system.attributes.length; j++) {
+			var attribute = system.attributes[j];
+			if (!allAttributes.includes(attribute)) {
+				allAttributes.push(attribute);
+			}
+		}
+	}
+	allAttributes.sort();
+	for (var i=0; i<allAttributes.length; i++) {
+		var attribute = allAttributes[i];
+		$("#controlsAttributes").append('<li class="controlsAttribute" id="controlsAttribute'+nameEsc(attribute)+'" onclick="highlightAttribute(\''+attribute+'\');">'+attribute+'</li>');
+	}
+	$("#mapControls").dialog({
+		  autoOpen: true,
+		  height: 250,
+		  width: 150,
+		  modal: false,
+		  close: function() {
+			  $("#systemDialog").dialog('mapControls');
 		  }
 		});
 });

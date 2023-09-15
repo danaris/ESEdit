@@ -69,18 +69,33 @@ $(function() {
 function addPlugin() {
 	$("#skyAddPluginDialog").dialog("open");
 }
+</script>#}
+<script>
+var spoilerFree = Cookies.get('spoilerFree') == undefined ? true : Cookies.get('spoilerFree') == 'true';
+function toggleSpoilers() {
+	spoilerFree = !spoilerFree;
+	Cookies.set('spoilerFree',spoilerFree);
+	location.reload();
+}
+$(function () {
+	if (spoilerFree) {
+		$("#spoilerSwitch").prop('checked',false);
+	} else {
+		$("#spoilerSwitch").prop('checked',true);
+	}
+	$("#spoilerSwitch").switchButton({ on_label: 'Spoilers', off_label: 'Spoiler-Free'});
+	$("#spoilerSwitch").on('change', toggleSpoilers);
+});
 </script>
 <div id="skyTop">
-	<div id="skyConfigBase">{{ skyBasePath() }}</div>
-	<div id="skyConfigPlugins"><select id="skyPluginNames" name="plugins">{% if skyPlugins|length > 0 %}{% for plugin in skyPlugins %}<option>{{ plugin.name }}</option>{% endfor %}{% else %}<option disabled>add a plugin</option>{% endif %}</select> <button type="button" id="skyPluginDeleteButton"{% if skyPlugins|length == 0 %} disabled{% endif %} onclick="deletePlugin();">del</button> <button type="button" id="skyPluginAddButton" onclick="addPlugin();">add</button></div>
-	
-	<div id="skyCacheButtons"><button type="button" onclick="clearDataCache();">D</button> <button type="button" onclick="clearImageCache();">I</button></div>
+	<div>
+		{% if source is defined %}
+		Source: <span id="sourceFile">{{ source['file'] }}</span> (<span id="sourceName">{{ source['name'] }}</span> <span id="sourceVersion">{{ source['version'] }})</span>
+		{% endif %}
+	</div>
+	<div>
+	</div>
+	<div id="skySpoilerSwitch">
+		<input type="checkbox" id="spoilerSwitch" value="1">
+	</div>
 </div>
-<div id="skyAddPluginDialog" title="Add a Plugin">
-	<fieldset id="skyPluginFieldset">
-		<label for="skyPluginName">Name:</label>
-		<input id="skyPluginName" name="skyPluginName" type="text">
-		<label for="skyPluginPath">Path:</label>
-		<input id="skyPluginPath" name="skyPluginPath" type="text" style="width: 30em;"> 
-	</fieldset>
-</div> #}

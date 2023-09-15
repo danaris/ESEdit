@@ -1,0 +1,1 @@
+missions["{{ mission.name|replace({'"': '\\"'})|raw }}"] = {{ mission|json_encode|raw }};

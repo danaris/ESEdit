@@ -50,7 +50,6 @@ class Body {
 	#[ORM\Column(type: 'integer', name: 'swizzle')]
 	protected int $swizzle = 0;
 	
-	
 	#[ORM\Column(type: 'float', name: 'frameRate')]
 	protected float $frameRate = 2.0 / 60.0;
 	
@@ -84,6 +83,13 @@ class Body {
 	// the same step over and over again.
 	protected int $currentStep = -1;
 	protected float $frame = 0.0;
+	
+	#[ORM\Column(type: 'string')]
+	protected string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	protected string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	protected string $sourceVersion = '';
 	
 // 		// Constructors.
 // 		Body() = default;
@@ -197,7 +203,7 @@ class Body {
 	}
 	
 	// Access the underlying Sprite object.
-	public function getSprite(): Sprite {
+	public function getSprite(): ?Sprite {
 		return $this->sprite;
 	}
 	
@@ -213,23 +219,23 @@ class Body {
 	
 	// Get the farthest a part of this sprite can be from its center.
 	public function getRadius(): float {
-		return .5 * (new Point($this->getWidth(), $this->Height())).getLength();
+		return .5 * (new Point($this->getWidth(), $this->getHeight()))->getLength();
 	}
 	
 	// Which color swizzle should be applied to the sprite?
 	public function getSwizzle(): int {
-		return $swizzle;
+		return $this->swizzle;
 	}
 	
-	// Get the frame index for the given time step. If no time step is given, this
-	// will return the frame from the most recently given step.
-	public function getFrame(int $step): float {
-		if ($step >= 0) { 
-			$this->setStep($step);
-		}
+	// // Get the frame index for the given time step. If no time step is given, this
+	// // will return the frame from the most recently given step.
+	// public function getFrame(int $step): float {
+	// 	if ($step >= 0) { 
+	// 		$this->setStep($step);
+	// 	}
 	
-		return $this->frame;
-	}
+	// 	return $this->frame;
+	// }
 	
 	// Get the mask for the given time step. If no time step is given, this will
 	// return the mask from the most recently given step.
@@ -267,9 +273,9 @@ class Body {
 	
 	// Unit vector in the direction this body is facing. This represents the scale
 	// and transform that should be applied to the sprite before drawing it.
-	public function getUnit(): Point {
-		return $this->angle->getUnit() * (.5 * $this->getZoom());
-	}
+	// public function getUnit(): Point {
+	// 	return $this->angle->getUnit()->mult(.5 * $this->getZoom());
+	// }
 	
 	// Zoom factor. This controls how big the sprite should be drawn.
 	public function getZoom(): float {
@@ -295,8 +301,32 @@ class Body {
 	
 	// Store the government here too, so that collision detection that is based
 	// on the Body class can figure out which objects will collide.
-	public function getGovernment(): Government {
-		return $this->government;
+	// public function getGovernment(): Government {
+	// 	return $this->government;
+	// }
+	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
 	}
 	
 	// Load the sprite specification, including all animation attributes.
@@ -305,6 +335,13 @@ class Body {
 			return;
 		}
 		$this->sprite = SpriteSet::Get($node->getToken(1));
+		if ($this->sprite == null) {
+			error_log('Null sprite for body with name '.$node->getToken(1));
+		}
+		
+		$this->sourceName = $node->getSourceName();
+		$this->sourceFile = $node->getSourceFile();
+		$this->sourceVersion = $node->getSourceVersion();
 	
 		// The only time the animation does not start on a specific frame is if no
 		// start frame is specified and it repeats. Since a frame that does not
@@ -374,8 +411,6 @@ class Body {
 		$out->endChild();
 	}
 	
-	
-	
 	// Set the sprite.
 	public function setSprite(Sprite $sprite): void {
 		$this->sprite = $sprite;
@@ -416,67 +451,67 @@ class Body {
 		$this->shouldBeRemoved = false;
 	}
 	
-	// Set the current time step.
-	public function setStep(int $step): void {
-		// If the animation is paused, reduce the step by however many frames it has
-		// been paused for.
-		$step -= $this->pause;
+	// // Set the current time step.
+	// public function setStep(int $step): void {
+	// 	// If the animation is paused, reduce the step by however many frames it has
+	// 	// been paused for.
+	// 	$step -= $this->pause;
 	
-		// If the step is negative or there is no sprite, do nothing. This updates
-		// and caches the mask and the frame so that if further queries are made at
-		// this same time step, we don't need to redo the calculations.
-		if ($step == $this->currentStep || $step < 0 || !$this->sprite || $this->sprite->getFrames() == 0) {
-			return;
-		}
-		$this->currentStep = $step;
+	// 	// If the step is negative or there is no sprite, do nothing. This updates
+	// 	// and caches the mask and the frame so that if further queries are made at
+	// 	// this same time step, we don't need to redo the calculations.
+	// 	if ($step == $this->currentStep || $step < 0 || !$this->sprite || $this->sprite->getFrames() == 0) {
+	// 		return;
+	// 	}
+	// 	$this->currentStep = $step;
 	
-		// If the sprite only has one frame, no need to animate anything.
-		$frames = $this->sprite->getFrames();
-		if ($frames <= 1.0) {
-			$this->frame = 0.0;
-			return;
-		}
-		$lastFrame = $frames - 1.0;
-		// This is the number of frames per full cycle. If rewinding, a full cycle
-		// includes the first and last frames once and every other frame twice.
-		$cycle = ($this->rewind ? 2.0 * $lastFrame : $frames) + $this->delay;
+	// 	// If the sprite only has one frame, no need to animate anything.
+	// 	$frames = $this->sprite->getFrames();
+	// 	if ($frames <= 1.0) {
+	// 		$this->frame = 0.0;
+	// 		return;
+	// 	}
+	// 	$lastFrame = $frames - 1.0;
+	// 	// This is the number of frames per full cycle. If rewinding, a full cycle
+	// 	// includes the first and last frames once and every other frame twice.
+	// 	$cycle = ($this->rewind ? 2.0 * $lastFrame : $frames) + $this->delay;
 	
-		// If this is the very first step, fill in some values that we could not set
-		// until we knew the sprite's frame count and the starting step.
-		if ($this->randomize) {
-			$this->randomize = false;
-			// The random offset can be a fractional frame.
-			$this->frameOffset += (mt_rand() / mt_getrandmax()) * $cycle;
-		} else if ($this->startAtZero) {
-			$this->startAtZero = false;
-			// Adjust frameOffset so that this step's frame is exactly 0 (no fade).
-			$this->frameOffset -= $this->frameRate * $step;
-		}
+	// 	// If this is the very first step, fill in some values that we could not set
+	// 	// until we knew the sprite's frame count and the starting step.
+	// 	if ($this->randomize) {
+	// 		$this->randomize = false;
+	// 		// The random offset can be a fractional frame.
+	// 		$this->frameOffset += (mt_rand() / mt_getrandmax()) * $cycle;
+	// 	} else if ($this->startAtZero) {
+	// 		$this->startAtZero = false;
+	// 		// Adjust frameOffset so that this step's frame is exactly 0 (no fade).
+	// 		$this->frameOffset -= $this->frameRate * $step;
+	// 	}
 	
-		// Figure out what fraction of the way in between frames we are. Avoid any
-		// possible floating-point glitches that might result in a negative frame.
-		$this->frame = max(0.0, $this->frameRate * $step + $this->frameOffset);
-		// If repeating, wrap the frame index by the total cycle time.
-		if ($this->repeat) {
-			$this->frame = fmod($this->frame, $cycle);
-		}
+	// 	// Figure out what fraction of the way in between frames we are. Avoid any
+	// 	// possible floating-point glitches that might result in a negative frame.
+	// 	$this->frame = max(0.0, $this->frameRate * $step + $this->frameOffset);
+	// 	// If repeating, wrap the frame index by the total cycle time.
+	// 	if ($this->repeat) {
+	// 		$this->frame = fmod($this->frame, $cycle);
+	// 	}
 	
-		if (!$this->rewind) {
-			// If not repeating, frame should never go higher than the index of the
-			// final frame.
-			if (!$this->repeat) {
-				$this->frame = min($this->frame, $this->lastFrame);
-			} else if ($this->frame >= $this->frames) {
-				// If we're in the delay portion of the loop, set the frame to 0.
-				$this->frame = 0.0;
-			}
-		} else if ($this->frame >= $this->lastFrame) {
-			// In rewind mode, once you get to the last frame, count backwards.
-			// Regardless of whether we're repeating, if the frame count gets to
-			// be less than 0, clamp it to 0.
-			$this->frame = max(0.0, $this->lastFrame * 2.0 - $this->frame);
-		}
-	}
+	// 	if (!$this->rewind) {
+	// 		// If not repeating, frame should never go higher than the index of the
+	// 		// final frame.
+	// 		if (!$this->repeat) {
+	// 			$this->frame = min($this->frame, $this->lastFrame);
+	// 		} else if ($this->frame >= $this->frames) {
+	// 			// If we're in the delay portion of the loop, set the frame to 0.
+	// 			$this->frame = 0.0;
+	// 		}
+	// 	} else if ($this->frame >= $this->lastFrame) {
+	// 		// In rewind mode, once you get to the last frame, count backwards.
+	// 		// Regardless of whether we're repeating, if the frame count gets to
+	// 		// be less than 0, clamp it to 0.
+	// 		$this->frame = max(0.0, $this->lastFrame * 2.0 - $this->frame);
+	// 	}
+	// }
 	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
@@ -509,6 +544,8 @@ class Body {
 		$jsonArray['startAtZero'] = $this->startAtZero;
 		$jsonArray['randomize'] = $this->randomize;
 		$jsonArray['rewind'] = $this->rewind;
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
 		
 		if ($justArray) {
 			return $jsonArray;

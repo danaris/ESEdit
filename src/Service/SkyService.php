@@ -12,6 +12,7 @@ use App\Entity\Sky\Description;
 use App\Entity\Sky\Galaxy;
 use App\Entity\Sky\GameData;
 use App\Entity\Sky\Government;
+use App\Entity\Sky\ImageSet;
 use App\Entity\Sky\Link;
 use App\Entity\Sky\LocationFilter;
 use App\Entity\Sky\Mission;
@@ -96,7 +97,7 @@ class SkyService {
 			}
 			$this->truncateTables(['Body', 'Color', 'ConditionSet', 'Conversation', 'ConversationElement', 'ConversationNode', 'Effect', 'EventTrigger', 'Expression', 'FlareSound', 'FlareSprite', 'GameAction', 'GameEvent', 'Government', 'GovernmentPenalty', 'JumpSound', 'LocationFilter', 'Mission', 'MissionAction', 'NPC', 'Outfit', 'OutfitAttributes', 'OutfitEffect', 'OutfitPenalty', 'Phrase', 'Planet', 'Ship', 'Sound', 'Sprite', 'SubExpression', 'System', 'SystemLink', 'TextReplacements', 'Wormhole', 'WormholeLink', 'locationfilter_government', 'locationfilter_system']);
 			if (!$loaded) {
-				$sources = [$_ENV['DATA_PATH']];
+				$sources = [['name'=>'vanilla','dir'=>$_ENV['DATA_PATH'],'version'=>'0.10.3a (3870808f)']];
 				GameData::SetSources($sources);
 				//$this->loadImageDB();		
 				$images = GameData::FindImages();

@@ -116,6 +116,13 @@ class Government {
 	
 	public static int $nextID = 0;
 	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
+	
 	// Load ShipEvent strings and corresponding numerical values into a map.
 	public static function LoadPenaltyHelper(DataNode $node, array &$penalties): void {
     	foreach ($node as $child) {
@@ -184,6 +191,11 @@ class Government {
     			$this->displayName = $this->name;
     		}
     	}
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
     
     	// For the following keys, if this data node defines a new value for that
     	// key, the old values should be cleared (unless using the "add" keyword).
@@ -222,7 +234,7 @@ class Government {
     					}
     				}
     			} else if ($key == "raid") {
-    				$this->raidFleets.clear();
+    				$this->raidFleets = [];
     			} else if ($key == "display name") {
     				$this->displayName = $this->name;
     			} else if ($key == "death sentence") {
@@ -317,9 +329,10 @@ class Government {
     				$gov = GameData::Governments()[$grand->getToken($remove || $add)];
     				if ($gov) {
     					if ($remove) {
-    						$this->trusted.erase($gov);
+							$govIndex = array_search($gov, $this->trusted);
+							array_splice($this->trusted, $govIndex, 1);
     					} else
-    						$this->trusted.insert($gov);
+    						$this->trusted []= $gov;
     				} else {
     					$grand->printTrace("Skipping unrecognized government:");
     				}
@@ -380,7 +393,8 @@ class Government {
     				}
     			}
     		} else if ($key == "enforces" && $child->hasChildren()) {
-    			$this->enforcementZones.emplace_back($child);
+				$EnforceFilter = new LocationFilter($child);
+    			$this->enforcementZones []= $EnforceFilter;
     		} else if ($key == "provoked on scan") {
     			$this->provokedOnScan = true;
     		} else if ($key == "foreign penalties for") {
@@ -597,6 +611,30 @@ class Government {
     	return ($this == GameData::PlayerGovernment());
     }
 	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
 	// Commit the given "offense" against this government (which may not
 	// actually consider it to be an offense). This may result in temporary
 	// hostilities (if the even type is PROVOKE), or a permanent change to your
@@ -605,22 +643,22 @@ class Government {
     	GameData::GetPolitics()->offend($this, $eventType, $count);
     }
 	
-	// Bribe this government to be friendly to you for one day.
-	public function bribe(): void {
-    	GameData::GetPolitics()->bribe($this);
-    }
+	// // Bribe this government to be friendly to you for one day.
+	// public function bribe(): void {
+    // 	GameData::GetPolitics()->bribe($this);
+    // }
 	
-	// Check to see if the player has done anything they should be fined for.
-	// Each government can only fine you once per day.
-	public function fine(PlayerInfo $player, int $scan, Ship $target, float $security): string {
-    	return GameData::GetPolitics()->fine($player, $this, $scan, $target, $security);
-    }
+	// // Check to see if the player has done anything they should be fined for.
+	// // Each government can only fine you once per day.
+	// public function fine(PlayerInfo $player, int $scan, Ship $target, float $security): string {
+    // 	return GameData::GetPolitics()->fine($player, $this, $scan, $target, $security);
+    // }
 	
 	public function condemns(Outfit $outfit): bool {
     	$isAtrocity = false;
     	$found = false;
-    	if (isset($this->atrocities[$outfit->getName()])) {
-    		$isAtrocity = $this->atrocities[$outfit->getName()]['atrocity'];
+    	if (isset($this->atrocities[$outfit->getTrueName()])) {
+    		$isAtrocity = $this->atrocities[$outfit->getTrueName()]['atrocity'];
     		$found = true;
     	}
     	return ($found && $isAtrocity) || (!$found && $outfit->get("atrocity") > 0.);
@@ -633,22 +671,22 @@ class Government {
     	}
     
     	foreach ($this->illegals as $outfitName => $illegalData) {
-    		if ($outfitName == $outfit->getName()) {
+    		if ($outfitName == $outfit->getTrueName()) {
     			return $illegalData['illegal'];
     		}
     	}
     	return $outfit->get("illegal");
     }
 	
-	public function getFinesContents(Ship $ship): bool {
-    	foreach ($ship->getOutfits() as $outfit) {
-    		if ($this->getFines($outfit) || $this->condemns($outfit)) {
-    			return true;
-    		}
-    	}
+	// public function getFinesContents(Ship $ship): bool {
+    // 	foreach ($ship->getOutfits() as $outfit) {
+    // 		if ($this->getFines($outfit) || $this->condemns($outfit)) {
+    // 			return true;
+    // 		}
+    // 	}
     
-    	return $ship->getCargo()->getIllegalCargoFine($this);
-    }
+    // 	return $ship->getCargo()->getIllegalCargoFine($this);
+    // }
 	
 	// Get or set the player's reputation with this government.
 	public function getReputation(): float {
@@ -708,6 +746,8 @@ class Government {
     	$jsonArray['crewAttack'] = $this->crewAttack;
     	$jsonArray['crewDefense'] = $this->crewDefense;
     	$jsonArray['provokedOnScan'] = $this->provokedOnScan;
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
     	
     	if ($justArray) {
     		return $jsonArray;
@@ -783,7 +823,7 @@ class Government {
 			if (isset($this->penaltyFor[$Penalty->getEventType()]) && $this->penaltyFor[$Penalty->getEventType()] == $Penalty->getPenalty()) {
 				$handledPenaltyTypes []= $Penalty->getEventType();
 			} else {
-				$eventArgs->getEntityManager()->remove($Penalty);
+				$eventArgs->getObjectManager()->remove($Penalty);
 			}
 		}
 		foreach ($this->penaltyFor as $eventType => $penaltyAmount) {
@@ -795,7 +835,7 @@ class Government {
 			$Penalty->setEventType($eventType);
 			$Penalty->setPenalty($penaltyAmount);
 			$this->penaltyForObject []= $Penalty;
-			$eventArgs->getEntityManager()->persist($Penalty);
+			$eventArgs->getObjectManager()->persist($Penalty);
 		}
 		$handledOutfits = [];
 		foreach ($this->outfitPenalties as $Penalty) {
@@ -803,16 +843,16 @@ class Government {
 				if (isset($this->illegals[$Penalty->getOutfit()->getTrueName()]) && $this->illegals[$Penalty->getOutfit()->getTrueName()] == $Penalty->getPenalty()) {
 					$handledOutfits []= $Penalty->getOutfit()->getTrueName();
 				} else {
-					$eventArgs->getEntityManager()->remove($Penalty);
+					$eventArgs->getObjectManager()->remove($Penalty);
 				}
 			} else if ($Penalty->getPenaltyType() == 'atrocity') {
 				if (isset($this->illegals[$Penalty->getOutfit()->getTrueName()])) {
 					$handledOutfits []= $Penalty->getOutfit()->getTrueName();
 				} else {
-					$eventArgs->getEntityManager()->remove($Penalty);
+					$eventArgs->getObjectManager()->remove($Penalty);
 				}
 			} else {
-				$eventArgs->getEntityManager()->remove($Penalty);
+				$eventArgs->getObjectManager()->remove($Penalty);
 			}
 		}
 		foreach ($this->illegals as $illegalName => $illegalFine) {

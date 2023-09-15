@@ -1,4 +1,4 @@
 var galaxies = {};
-{% for galName, galaxy in galaxies %}
-galaxies["{{galName|raw }}"] = {{ galaxy|json_encode|raw }};
+{% for galaxy in galaxies %}
+	{% include 'sky/data/galaxy.js.twig' %}
 {% endfor %}

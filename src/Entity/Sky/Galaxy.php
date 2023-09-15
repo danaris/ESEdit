@@ -27,12 +27,24 @@ class Galaxy {
 	#[ORM\JoinColumn(nullable: true, name: 'spriteId')]
 	private ?Sprite $sprite = null;
 	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
+	
 	public function __construct() {
 		$this->position = new Point();
 	}
 	
 	public function load(DataNode $node): void {
 		$this->name = $node->getToken(1);
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
 		foreach ($node as $child) {
 			$remove = $child->getToken(0) == "remove";
 			$keyIndex = $remove;
@@ -67,6 +79,30 @@ class Galaxy {
 		return $this->sprite;
 	}
 	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
 		$this->positionStr = json_encode($this->position);
@@ -84,6 +120,8 @@ class Galaxy {
 		$jsonArray['name'] = $this->name;
 		$jsonArray['position'] = $this->position->toJSON(true);
 		$jsonArray['spriteId'] = $this->sprite?->getId();
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
 		
 		if ($justArray) {
 			return $jsonArray;

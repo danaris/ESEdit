@@ -17,6 +17,8 @@ class ImageSet {
 	private int $width = 0;
 	private int $height = 0;
 	
+	private array $source;
+	
 	// Determine whether the given path is to an @2x image.
 	public static function Is2x(string $path): bool {
 		if (strlen($path) < 7) {
@@ -184,10 +186,17 @@ class ImageSet {
 		$this->framePaths[$is2x][$frame] = $path;
 		
 		if ($this->width == 0) {
-			$imageSize = getimagesize($path);
+			$imageSize = getimagesize($_ENV['DATA_PATH'].'images/'.$path);
 			$this->width = $imageSize[0];
 			$this->height = $imageSize[1];
 		}
+	}
+	
+	public function setSource(array $source): void {
+		$this->source = $source;
+	}
+	public function getSource(): array {
+		return $this->source;
 	}
 	
 	// Reduce all given paths to frame images into a sequence of consecutive frames.

@@ -18,3 +18,4 @@
 /.nova
 /WIP/Version*
 composer.lock
+public/sky/data

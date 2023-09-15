@@ -3,20 +3,26 @@
 namespace App\Entity\Sky;
 
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\ORM\PersistentCollection;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\Common\Collections\Criteria;
 use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Event\PostLoadEventArgs;
+use ApiPlatform\Metadata\ApiResource;
 
 use App\Entity\DataNode;
 use App\Entity\TemplatedArray;
 
 use App\Service\TemplatedArrayService;
 
+/**
+ * A single star system on the Endless Sky galaxy map
+ */
 #[ORM\Entity]
 #[ORM\Table(name: 'System')]
 #[ORM\HasLifecycleCallbacks]
+#[ApiResource]
 class System {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -87,7 +93,7 @@ class System {
 	// guaranteed to appear before it (so that if we traverse the vector in
 	// order, updating positions, an object's parents will already be at the
 	// proper position before that object is updated).
-	#[ORM\OneToMany(mappedBy: 'system', targetEntity: StellarObject::class, cascade: ['persist'])]
+	#[ORM\OneToMany(mappedBy: 'system', targetEntity: StellarObject::class, cascade: ['persist'], fetch: 'EAGER')]
 	private Collection $objects; //vector<StellarObject>
 	private array $asteroids = []; //vector<Asteroid>
 	
@@ -155,13 +161,20 @@ class System {
     private Collection $wormholeToLinks; //set<string>
 	
 	#[ORM\OneToMany(mappedBy: 'fromSystem', targetEntity: SystemLink::class, orphanRemoval: true, cascade: ['persist'])]
-	private Collection $fromLinks;
+	private PersistentCollection|ArrayCollection $fromLinks;
 	
 	#[ORM\OneToMany(mappedBy: 'toSystem', targetEntity: SystemLink::class, orphanRemoval: true, cascade: ['persist'])]
 	private Collection $toLinks;
 
     #[ORM\OneToMany(mappedBy: 'fromSystem', targetEntity: SystemNeighbor::class, orphanRemoval: true, cascade: ['persist'])]
     private Collection $systemNeighbors;
+	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
 	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
@@ -229,6 +242,11 @@ class System {
 		}
 		$this->name = $node->getToken(1);
 		$this->isDefined = true;
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
 	
 		// For the following keys, if this data node defines a new value for that
 		// key, the old values should be cleared (unless using the "add" keyword).
@@ -357,7 +375,7 @@ class System {
 						array_splice($this->links, $linkIndex, 1);
 					}
 				} else {
-					error_log('Defining link from '.$this->name.' to '.$value);
+					//error_log('Defining link from '.$this->name.' to '.$value);
 					$this->links []= $value;
 				}
 			} else if ($key == "asteroids") {
@@ -445,7 +463,7 @@ class System {
 					foreach ($toRemoveIndices as $index) {
 						$object = $this->objects[$index];
 						if ($object->planet) {
-							$this->planets[$object->planet->getTrueName()]->removeSystem($this);
+							$planets[$object->planet->getTrueName()]->removeSystem($this);
 						}
 						unset($this->objects[$index]);
 					}
@@ -484,7 +502,7 @@ class System {
 					if ($type == "link" && $grand->size() >= 2) {
 						$this->extraHyperArrivalDistance = $grand->getValue(1);
 					} else if ($type == "jump" && $grand->size() >= 2) {
-						$this->extraJumpArrivalDistance = fabs($grand->getValue(1));
+						$this->extraJumpArrivalDistance = abs($grand->getValue(1));
 					} else {
 						$grand->printTrace("Warning: Skipping unsupported arrival distance limitation:");
 					}
@@ -499,7 +517,7 @@ class System {
 					if ($type == "link" && $grand->size() >= 2) {
 						$this->hyperDepartureDistance = $grand->getValue(1);
 					} else if ($type == "jump" && $grand->size() >= 2) {
-						$this->jumpDepartureDistance = fabs($grand->getValue(1));
+						$this->jumpDepartureDistance = abs($grand->getValue(1));
 					} else {
 						$grand->printTrace("Warning: Skipping unsupported departure distance limitation:");
 					}
@@ -680,6 +698,30 @@ class System {
 // 		other->links.erase(this);
 // 		// accessibleLinks will be updated when UpdateSystem is called.
 // 	}
+
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
 	
 	// Check that this system has been loaded and given a position.
 	public function isValid(): bool {
@@ -1011,7 +1053,7 @@ class System {
 		foreach ($this->fleets as $fleetData) {
 			$gov = $fleetData['fleet']->getGovernment();
 			if ($gov && $gov->isEnemy()) {
-				$danger += $fleet->get()->getStrength() / $fleet->getPeriod();
+				$danger += $$fleetData['fleet']->get()->getStrength() / $$fleetData['fleet']->getPeriod();
 			}
 		}
 		return $danger;
@@ -1241,6 +1283,8 @@ class System {
 			}
 		}
 		//error_log('-% Returning');
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
 		
 		if ($justArray) {
 			return $jsonArray;

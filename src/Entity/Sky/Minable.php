@@ -72,11 +72,13 @@ class Minable extends Body {
 	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		parent::toDatabase($eventArgs);
 		$this->spinDegrees = $this->spin->getDegrees();
 	}
 	
 	#[ORM\PostLoad]
 	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		parent::fromDatabase($eventArgs);
 		$this->spin = new Angle($this->spinDegrees);
 	}
 	
@@ -90,6 +92,11 @@ class Minable extends Body {
 		// Set the name of this minable, so we know it has been loaded.
 		if ($node->size() >= 2) {
 			$this->name = $node->getToken(1);
+		}
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
 		}
 	
 		foreach ($node as $child) {

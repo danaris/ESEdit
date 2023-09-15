@@ -13,6 +13,7 @@
 	<script src="/js/jquery-3.6.0.js"></script>
 	<script src="/js/jquery-ui.js"></script>
 	<script src="/js/jquery.switchButton.js"></script>
+	<script src="/js/js.cookie.js"></script>
 	<link rel="stylesheet" href="/css/sky.css?v=5">
 	{% block stylesheets %}
 	{% endblock %}
@@ -21,6 +22,7 @@
 	<title>{% block title %}Endless Sky Editor{% endblock %}</title>
 </head>
 <body>
+	{% include 'sky/topbar.html.twig' %}
 	{% include 'flashes.html.twig' %}
 <div id="content">
 	{% block content %}

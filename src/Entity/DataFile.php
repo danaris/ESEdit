@@ -5,13 +5,24 @@ namespace App\Entity;
 class DataFile implements \Iterator, \ArrayAccess {
 	protected DataNode $root;
 	
-	public string $fromFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
 	
 	// Constructor, taking a file path (in UTF-8).
-	public function __construct(string $path) {
-		$this->root = new DataNode(fromFile: $path);
-		$this->fromFile = $path;
-		$this->load($path);
+	public function __construct(array $sourceInfo) {
+		$this->root = new DataNode(source: $sourceInfo);
+		$this->sourceName = $sourceInfo['name'];
+		$this->sourceFile = $sourceInfo['file'];
+		$this->sourceVersion = $sourceInfo['version'];
+		$this->load($sourceInfo['file']);
+	}
+	
+	public function getSource(): array {
+		return ['name'=>$this->sourceName, 'file'=>$this->sourceFile, 'version'=>$this->sourceVersion];
 	}
 	
 	// Load from a file path (in UTF-8).
@@ -143,7 +154,7 @@ class DataFile implements \Iterator, \ArrayAccess {
 	
 			// Add this node as a child of the proper node.
 			$stackBack = $stack[array_key_last($stack)];
-			$node = new DataNode(parent: $stackBack, fromFile: $this->fromFile);
+			$node = new DataNode(parent: $stackBack, source: $this->getSource());
 			$stackBack []= $node;
 			$node->setLineNumber($lineNumber);
 	

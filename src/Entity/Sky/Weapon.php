@@ -254,6 +254,13 @@ class Weapon {
     #[ORM\OneToMany(mappedBy: 'weapon', targetEntity: AmmoOutfit::class, orphanRemoval: true, cascade: ['persist'])]
     protected Collection $ammoOutfits; // pair<DistributionType, bool>
 	
+	#[ORM\Column(type: 'string')]
+	protected string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	protected string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	protected string $sourceVersion = '';
+	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
 		$this->hardpointOffsetString = json_encode($this->hardpointOffset);
@@ -319,12 +326,14 @@ class Weapon {
 		$this->hardpointOffset = new Point(0.0, 0.0);
 		$this->inaccuracyDistribution = [DistributionType::Triangular, false];
 		$this->sprite = new Body();
+		$this->sprite->setSourceName('Weapon::__construct() (s)');
 		$this->hardpointSprite = new Body();
+		$this->hardpointSprite->setSourceName('Weapon::__construct() (h)');
 		for ($i = 0; $i < self::DAMAGE_TYPES; $i++) {
 			$this->damage[$i] = 0.0;
 		}
-                                         $this->weaponDamage = new ArrayCollection();
-                                         $this->ammoOutfits = new ArrayCollection();
+		$this->weaponDamage = new ArrayCollection();
+		$this->ammoOutfits = new ArrayCollection();
 	}
 	
 	// Accessors
@@ -571,6 +580,30 @@ class Weapon {
 		return $this->hasDamageDropoff;
 	}
 	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
 	// Load from a "weapon" node, either in an outfit or in a ship (explosion).
 	public function loadWeapon(DataNode $node): void {
 		$this->isWeapon = true;
@@ -600,7 +633,7 @@ class Weapon {
 			} else if ($key == "gravitational") {
 				$this->isGravitational = true;
 			} else if ($child->size() < 2) {
-				$child->printTrace("Skipping weapon attribute with no $value specified:");
+				$child->printTrace("Skipping weapon attribute with no value specified:");
 			} else if ($key == "sprite") {
 				$this->sprite->loadSprite($child);
 			} else if ($key == "hardpoint sprite") {

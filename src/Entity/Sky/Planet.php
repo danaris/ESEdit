@@ -43,13 +43,6 @@ class Planet {
 	private string $attributesString = '';
 	private array $attributes = []; //set<string>
 	
-	private array $shipSales = []; //set<const Sale<Ship> *>
-	private array $outfitSales = []; //set<const Sale<Outfit> *>
-	// The lists above will be converted into actual ship lists when they are
-	// first asked for:
-	private $shipyard; // Sale<Ship>
-	private $outfitter; // Sale<Outfit>
-	
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Government', inversedBy: 'governmentPlanet')]
 	#[ORM\JoinColumn(nullable: true, name: 'governmentId')]
 	private ?Government $government = null;
@@ -106,17 +99,52 @@ class Planet {
 	
 	#[ORM\OneToMany(targetEntity: 'App\Entity\Sky\Mission', mappedBy: 'source')]
 	private Collection $sourcedMissions;
+
+    #[ORM\ManyToMany(targetEntity: Sale::class, inversedBy: 'planets')]
+    private Collection $sales;
+	
+	private array $shipSales = [];
+	private array $outfitSales = [];
+	
+	// The lists above will be converted into actual ship lists when they are
+	// first asked for:
+	private $shipyard; // Sale<Ship>
+	private $outfitter; // Sale<Outfit>
+	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
 	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
 		$this->attributesString = json_encode($this->attributes);
 		$this->requiredAttributesString = json_encode($this->requiredAttributes);
+		foreach ($this->shipSales as $ShipSale) {
+			if (!$this->sales->contains($ShipSale)) {
+				$this->sales []= $ShipSale;
+			}
+		}
+		foreach ($this->outfitSales as $OutfitSale) {
+			if (!$this->sales->contains($OutfitSale)) {
+				$this->sales []= $OutfitSale;
+			}
+		}
 	}
 	
 	#[ORM\PostLoad]
 	public function fromDatabase(PostLoadEventArgs $eventArgs) {
 		$this->attributes = json_decode($this->attributesString, true);
 		$this->requiredAttributes = json_decode($this->requiredAttributesString, true);
+		foreach ($this->sales as $Sale) {
+			if ($Sale->getType() == Ship::class) {
+				$this->shipSales []= $Sale;
+			} else {
+				$this->outfitSales []= $Sale;
+			}
+		}
 	}
 	
 	const WORMHOLE = "wormhole";
@@ -135,6 +163,7 @@ class Planet {
 	
 	public function __construct() {
 		$this->systems = new ArrayCollection();
+		$this->sales = new ArrayCollection();
 	}
 
 	// Load a planet's description from a file.
@@ -143,6 +172,11 @@ class Planet {
 			return;
 		}
 		$this->name = $node->getToken(1);
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
 		// The planet's name is needed to save references to this object, so a
 		// flag is used to test whether Load() was called at least once for it.
 		$this->isDefined = true;
@@ -152,7 +186,7 @@ class Planet {
 		$shouldOverwrite = ["attributes", "description", "spaceport"];
 	
 		foreach ($node as $child) {
-
+                              
 			// Check for the "add" or "remove" keyword.
 			$add = ($child->getToken(0) == "add");
 			$remove = ($child->getToken(0) == "remove");
@@ -192,7 +226,7 @@ class Planet {
 				} else if ($key == "outfitter") {
 					$this->outfitSales = [];
 				} else if ($key == "government") {
-					$this->government = nullptr;
+					$this->government = null;
 				} else if ($key == "required reputation") {
 					$this->requiredReputation = 0.;
 				} else if ($key == "bribe") {
@@ -228,17 +262,17 @@ class Planet {
 					}
 				}
 			} else if ($key == "shipyard") {
-				// if ($remove) {
-				// 	unset($this->shipSales[GameData::Shipyards()[$value]]);
-				// } else {
-				// 	$this->shipSales []= GameData::Shipyards()[$value];
-				// }
+				if ($remove) {
+					unset($this->shipSales[GameData::Shipyards()[$value]]);
+				} else {
+					$this->shipSales []= GameData::Shipyards()[$value];
+				}
 			} else if ($key == "outfitter") {
-				// if ($remove) {
-				// 	unset($this->outfitSales[GameData::Outfitters()[$value]]);
-				// } else {
-				// 	$this->outfitSales []= GameData::Outfitters()[$value];
-				// }
+				if ($remove) {
+					unset($this->outfitSales[GameData::Outfitters()[$value]]);
+				} else {
+					$this->outfitSales []= GameData::Outfitters()[$value];
+				}
 			// Handle the attributes which cannot be "removed."
 			} else if ($remove) {
 				$child->printTrace("Error: Cannot \"remove\" a specific value from the given key:");
@@ -325,6 +359,30 @@ class Planet {
 			error_log('Normal generation of wormhole '.$this->name.' from a planet');
 			$this->wormhole->loadFromPlanet($this);
 		}
+	}
+	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
 	}
 
 	// Test if this planet has been loaded (vs. just referred to). It must also be located in
@@ -460,7 +518,7 @@ class Planet {
 	}
 
 	public function getSystem(): ?System {
-		return (count($this->systems) == 0 ? null : $this->systems[0]);
+		return (count($this->systems) == 0 ? null : $this->systems[$this->systems->getKeys()[0]]);
 	}
 
 	// Check if this planet is in the given system. Note that wormholes may be
@@ -484,7 +542,7 @@ class Planet {
 		}
 	}
 
-	public function getSystems(): array {
+	public function getSystems(): Collection {
 		return $this->systems;
 	}
 
@@ -515,7 +573,7 @@ class Planet {
 		$shipAttributes = $ship->getAttributes();
 		$allRequired = true;
 		foreach ($this->requiredAttributes as $attribute) {
-			if (!in_array($attribute, $shipAttributes)) {
+			if (!in_array($attribute, $shipAttributes->getAttributes())) {
 				$allRequired = false;
 			}
 		}
@@ -535,7 +593,7 @@ class Planet {
 
 	public function canLand(?Ship $ship = null): bool {
 		if ($ship) {
-			return $this->isAccessible($ship) && GameData::GetPolitics()->canLand($ship, $this);
+			return $this->isAccessible($ship) && GameData::GetPolitics()->canLand($this, $ship);
 		} else {
 			return GameData::GetPolitics()->canLand($this);
 		}
@@ -557,9 +615,9 @@ class Planet {
 		return GameData::GetPolitics()->canUseServices($this);
 	}
 
-	public function bribe(bool $fullAccess): void {
-		GameData::GetPolitics()->bribePlanet($this, $fullAccess);
-	}
+	// public function bribe(bool $fullAccess): void {
+	// 	GameData::GetPolitics()->bribePlanet($this, $fullAccess);
+	// }
 
 // 	// Demand tribute, and get the planet's response.
 // 	string Planet::DemandTribute(PlayerInfo &player) const
@@ -645,8 +703,14 @@ class Planet {
 		$jsonArray['music'] = $this->music;
 		
 		$jsonArray['attributes'] = $this->attributes;
-		$jsonArray['shipSales'] = $this->shipSales;
-		$jsonArray['outfitSales'] = $this->outfitSales;
+		$jsonArray['shipSales'] = [];
+		foreach ($this->shipSales as $Shipyard) {
+			$jsonArray['shipSales'] []= $Shipyard->getName();
+		}
+		$jsonArray['outfitSales'] = [];
+		foreach ($this->outfitSales as $Outfitter) {
+			$jsonArray['outfitSales'] []= $Outfitter->getName();
+		}
 		
 		$jsonArray['government'] = $this->getGovernment() ? $this->getGovernment()->getTrueName() : null;
 		$jsonArray['requiredReputation'] = $this->requiredReputation;
@@ -669,11 +733,46 @@ class Planet {
 			$jsonArray['systems'] []= $system->getName();
 		}
 		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
+		
 		if ($justArray) {
 			return $jsonArray;
 		}
 		
 		return json_encode($jsonArray);
 	}
+
+    /**
+     * @return Collection<int, Sale>
+     */
+    public function getShipyards(): array
+    {
+        return $this->shipSales;
+    }
+
+    public function addShipyard(Sale $shipyard): static
+    {
+        if (!in_array($shipyard, $this->shipSales)) {
+            $this->shipSales []= $shipyard;
+        }
+
+        return $this;
+    }
+
+    public function removeShipyard(Sale $shipyard): static
+    {
+		$sIndex = array_search($shipyard, $this->shipSales);
+		array_splice($this->shipSales, $sIndex, 1);
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Sale>
+     */
+    public function getOutfitters(): array
+    {
+        return $this->outfitSales;
+    }
 
 }
