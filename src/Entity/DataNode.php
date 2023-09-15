@@ -288,7 +288,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		return $this->children[$this->children->getKeys()[$this->iterIndex]];
 	}
 	
-	public function key(): scalar {
+	public function key(): mixed { // scalar
 		return array_keys($this->children)[$this->iterIndex];
 	}
 	
