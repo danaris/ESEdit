@@ -51,10 +51,9 @@
 <g>
 	{% if system.haze %}
 		{% set hazeImage = imageFor(system.haze) %}
-	<image id="{{ system.name|cssNameEsc }}-haze" xlink:href="{{ path('SkyImagePath', {imagePath: hazeImage['path']}) }}" x="0" y="0"/>
+	<image id="{{ system.name|cssNameEsc }}-haze" xlink:href="{{ spritePath(hazeImage) }}" x="0" y="0"/>
 	{% endif %}
 	{% for index, object in system.objects %}
-		{% set objectImage = imageFor(object.sprite.name) %}
 		{% set objectPosition = esToSvg(stellarObjectPosition(system, object, startDay), size) %}
 		{% if object.planet %}
 			{% set objectLabelInfo = createLabel(system, object, startDay, size) %}
@@ -66,7 +65,7 @@
 	</g>
 		{% endif %}
 			
-		<image id="{{ system.name|cssNameEsc }}-object-{{ index }}" xlink:href="{{ path('SkyImagePath', {imagePath: objectImage['path']}) }}" x="{{ objectPosition.x - (objectImage['width']/2) }}" y="{{ objectPosition.y - (objectImage['height']/2) }}"{% if object.planet %} style="cursor: pointer;" filter="url(#planetGlow)" onclick="planetInfo('{{ object.planet.trueName }}');"{% endif %} />
+		<image id="{{ system.name|cssNameEsc }}-object-{{ index }}" xlink:href="{{ spritePath(object.sprite) }}" x="{{ objectPosition.x - (object.sprite.width/2) }}" y="{{ objectPosition.y - (object.sprite.height/2) }}"{% if object.planet %} style="cursor: pointer;" filter="url(#planetGlow)" onclick="planetInfo('{{ object.planet.trueName }}');"{% endif %} />
 	{% endfor %}
 	
 </g>

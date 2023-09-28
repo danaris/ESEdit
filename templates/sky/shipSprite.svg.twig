@@ -35,13 +35,13 @@ function updateSprite(ship) {
 		img.setAttributeNS(null,'height',shipSprite.height);
 		img.setAttributeNS(null,'width',shipSprite.width);
 		img.setAttributeNS(null,'id','spriteImage' + i);
-		img.setAttributeNS('http://www.w3.org/1999/xlink','href','/skyImage/' + shipSprite.id + '/' + i);
+		img.setAttributeNS('http://www.w3.org/1999/xlink','href','/skyImage/' + shipSprite.paths[i]);
 		img.setAttributeNS(null,'x',0);
 		img.setAttributeNS(null,'y',0);
 		$("#swizzled").append(img);
 		
 		var image = new Image();
-		image.src = '/skyImage/' + shipSprite.id + '/' + i;
+		image.src = '/skyImage/' + shipSprite.paths[i];
 		if (frameCount > 1) {
 			image.onload = imageLoaded;
 		}
@@ -73,7 +73,7 @@ $(function() {
 	if (frameCount > 1) {
 		for (var i=0; i<frameCount; i++) {
 			var image = new Image();
-			image.src = '/skyImage/{{ Sprite.id }}/'+i;
+			image.src = '/skyImage/'+curShipSprite.paths[i];
 			image.onload = imageLoaded;
 		}
 	}
@@ -376,10 +376,10 @@ $(function() {
 	<g id="hardpointsUnder">
 	</g>
 	<g id="swizzled">
-		<image class="swizzleReady" id="spriteImage0" xlink:href="{{ path("SkyImagePath", {spriteId: Sprite.id}) }}" x="0" y="0" filter="url(#swizzle0)" />
+		<image class="swizzleReady" id="spriteImage0" xlink:href="{{ spritePath(Sprite) }}" x="0" y="0" filter="url(#swizzle0)" />
 		{% if Sprite.frames > 1 %}
 			{% for i in 1..Sprite.frames-1 %}
-		<image class="swizzleReady" id="spriteImage{{ i }}" style="display: none;" xlink:href="{{ path("SkyImagePath", {spriteId: Sprite.id, frameId: i}) }}" x="0" y="0" filter="url(#swizzle0)" />
+		<image class="swizzleReady" id="spriteImage{{ i }}" style="display: none;" xlink:href="{{ spritePath(Sprite, i) }}" x="0" y="0" filter="url(#swizzle0)" />
 			{% endfor %}
 		{% endif %}
 	</g>

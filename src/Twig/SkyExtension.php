@@ -26,9 +26,7 @@ class SkyExtension extends AbstractExtension {
 	public function __construct(protected SkyService $skyService,
 								protected EntityManagerInterface $em,
 								protected LoggerInterface $logger) {
-		if (count($this->em->getRepository(System::class)->findAll()) == 0) {
-			$this->skyService->loadUniverseFromFiles();
-		}
+		$this->skyService->loadUniverseFromFiles();
 	}
 	
 	public function getFilters() {
@@ -152,7 +150,7 @@ class SkyExtension extends AbstractExtension {
 			$imagePath = 'outfits/unknown.png';
 		}
 		
-		return '/skyImages/'.$imagePath;
+		return '/skyImage/'.$imagePath;
 	}
 	
 	public function esToSvg(SkyPoint $point, float $size): SkyPoint {

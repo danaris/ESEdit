@@ -65,12 +65,16 @@ $(function() {
 		shipCategories[ship.attributesOutfit.category].push(ship);
 		if (ship.thumbnailId) {
 			var shipImage = new Image();
-			shipImage.src = '/skyImage/'+ship.thumbnailId;
+			var thumbnailSprite = sprites[ship.thumbnailId];
+			shipImage.src = '/skyImage/'+thumbnailSprite.paths[0];
 			shipImages.push(shipImage);
 		} else {
 			var shipImage = new Image();
-			shipImage.src = '/skyImage/'+ship.spriteId;
-			shipImages.push(shipImage);
+			var shipSprite = sprites[ship.spriteId];
+			if (shipSprite) {
+				shipImage.src = '/skyImage/'+shipSprite.paths[0];
+				shipImages.push(shipImage);
+			}
 		}
 	}
 	$("#shipList").html('');
@@ -86,9 +90,15 @@ $(function() {
 			}
 			shipDisplay += '</div>';
 			if (ship.thumbnailId) {
-				shipDisplay += '<div class="shipThumbnail"><img src="/skyImage/'+ship.thumbnailId+'"></div>';
+				var thumbnailSprite = sprites[ship.thumbnailId];
+				shipDisplay += '<div class="shipThumbnail"><img src="/skyImage/'+thumbnailSprite.paths[0]+'"></div>';
 			} else {
-				shipDisplay += '<div class="shipThumbnail"><img src="/skyImage/'+ship.spriteId+'"></div>';
+				var shipSprite = sprites[ship.spriteId];
+				if (shipSprite) {
+					shipDisplay += '<div class="shipThumbnail"><img src="/skyImage/'+shipSprite.paths[0]+'"></div>';
+				} else {
+					shipDisplay += '<div class="shipThumbnail"><img src="/skyImage/outfit/unknown.png"></div>';
+				}
 			}
 			
 			shipDisplay += '</div></a>';

@@ -219,6 +219,7 @@ function selectVariant() {
 	var variantShip = variants[variantName];
 	if (variantShip != undefined) {
 		curShip = variantShip;
+		curShipSprite = sprites[curShip.spriteId];
 	}
 	updateShip(curShip.addAttributes);
 	if (variantShip.sprite != undefined && variantShip.sprite != null) {
@@ -302,7 +303,7 @@ function updateShip(recalcAttrs=false) {
 		}
 		if (hardpointSpriteId) {
 			var hardpointSprite = sprites[hardpointSpriteId];
-			var hardpointSource = '/skyImage/'+hardpointSpriteId;
+			var hardpointSource = '/skyImage/'+hardpointSprite.paths[0];
 			var hardpointImage = new Image();
 			hardpointImage.src = hardpointSource;
 			var img = document.createElementNS('http://www.w3.org/2000/svg','image');
