@@ -254,8 +254,12 @@ class Mission {
 	private Collection $didEnter; // set<const MissionAction *>
 
 	// TGC added
-	#[ORM\Column(type: 'string', name: 'fromFile')]
-	public string $fromFile = '';
+	#[ORM\Column(type: 'string', name: 'sourceName')]
+	public string $sourceName = '';
+	#[ORM\Column(type: 'string', name: 'sourceFile')]
+	public string $sourceFile = '';
+	#[ORM\Column(type: 'string', name: 'sourceVersion')]
+	public string $sourceVersion = '';
 	public array $isUnlockedBy = [];
 	public array $unlocksOn = [];
 	public array $isBlockedBy = [];
@@ -307,29 +311,29 @@ class Mission {
 		"disabled" => Trigger::DISABLED
 	];
 	
-	public static function PickCommodity(System $from, System $to): Commodity {
-		$weight = [];
-		$total = 0;
-		foreach (GameData::Commodities() as $commodity) {
-			// For every 100 credits in profit you can make, double the chance
-			// of this commodity being chosen.
-			$profit = $to->trade($commodity->name) - $from->trade($commodity->name);
-			$w = intval(max(1, 100. * pow(2., $profit * .01)));
-			$weight []= $w;
-			$total += $w;
-		}
-		$total += !$total;
-		// Pick a random commodity based on those weights.
-		$r = rand(0, $total);
-		for ($i = 0; $i < count($weight); ++$i) {
-			$r -= $weight[$i];
-			if ($r < 0) {
-				return GameData::Commodities()[$i];
-			}
-		}
-		// Control will never reach here, but to satisfy the compiler:
-		return null;
-	}
+	// public static function PickCommodity(System $from, System $to): Commodity {
+	// 	$weight = [];
+	// 	$total = 0;
+	// 	foreach (GameData::Commodities() as $commodity) {
+	// 		// For every 100 credits in profit you can make, double the chance
+	// 		// of this commodity being chosen.
+	// 		$profit = $to->trade($commodity->name) - $from->trade($commodity->name);
+	// 		$w = intval(max(1, 100. * pow(2., $profit * .01)));
+	// 		$weight []= $w;
+	// 		$total += $w;
+	// 	}
+	// 	$total += !$total;
+	// 	// Pick a random commodity based on those weights.
+	// 	$r = rand(0, $total);
+	// 	for ($i = 0; $i < count($weight); ++$i) {
+	// 		$r -= $weight[$i];
+	// 		if ($r < 0) {
+	// 			return GameData::Commodities()[$i];
+	// 		}
+	// 	}
+	// 	// Control will never reach here, but to satisfy the compiler:
+	// 	return null;
+	// }
 
 	// If a source, destination, waypoint, or stopover supplies more than one explicit choice
 	// or a mixture of explicit choice and location filter, print a warning.
@@ -395,13 +399,30 @@ class Mission {
 		$this->stopoverFilters = new ArrayCollection();
 		$this->visitedWaypoints = new ArrayCollection();
 		$this->visitedStopovers = new ArrayCollection();
+		$this->npcs = new ArrayCollection();
 		if ($node) {
 			$this->load($node);
 		}
 	}
 	
+	public function getSource(): ?Planet {
+		return $this->source;
+	}
+	
 	public function getToOffer(): ConditionSet {
 		return $this->toOffer;
+	}
+	
+	public function getToAccept(): ConditionSet {
+		return $this->toAccept;
+	}
+	
+	public function getToComplete(): ConditionSet {
+		return $this->toComplete;
+	}
+	
+	public function getToFail(): ConditionSet {
+		return $this->toFail;
 	}
 	
 	public function getActions(): TemplatedArray {
@@ -424,15 +445,20 @@ class Mission {
 			return;
 		}
 		$this->name = $node->getToken(1);
-		if ($node->fromFile) {
-			$this->fromFile = $node->fromFile;
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
+		if ($this->name == "First Contact: Bunrodea (Hostile)") {
+			error_log('Loading Bun FC mission');
 		}
 	
 		foreach ($node as $child) {
 			if ($child->getToken(0) == "name" && $child->size() >= 2) {
 				$this->displayName = $child->getToken(1);
 			} else if ($child->getToken(0) == "uuid" && $child->size() >= 2) {
-				$this->uuid = EsUuid::FromString($child->getToken(1));
+				//$this->uuid = EsUuid::FromString($child->getToken(1));
 			} else if ($child->getToken(0) == "description" && $child->size() >= 2) {
 				$this->description = $child->getToken(1);
 			} else if ($child->getToken(0) == "blocked" && $child->size() >= 2) {
@@ -505,9 +531,9 @@ class Mission {
 					}
 				}
 			} else if ($child->getToken(0) == "shipyard") {
-				$this->location = SHIPYARD;
+				$this->location = Location::SHIPYARD;
 			} else if ($child->getToken(0) == "outfitter") {
-				$this->location = OUTFITTER;
+				$this->location = Location::OUTFITTER;
 			} else if ($child->getToken(0) == "repeat") {
 				$this->repeat = ($child->size() == 1 ? 0 : intval($child->getValue(1)));
 			} else if ($child->getToken(0) == "clearance") {
@@ -560,16 +586,18 @@ class Mission {
 			} else if ($child->getToken(0) == "substitutions" && $child->hasChildren()) {
 				$this->substitutions->load($child);
 			} else if ($child->getToken(0) == "npc") {
-				$npc = new NPC($child, $this->name);
-				$npcs []= $npc;
+				$npc = new NPC($child, $this);
+				$this->npcs []= $npc;
 			} else if ($child->getToken(0) == "on" && $child->size() >= 2 && $child->getToken(1) == "enter") {
 				// "on enter" nodes may either name a specific system or use a LocationFilter
 				// to control the triggering system.
 				if ($child->size() >= 3) {
 					$action = $this->onEnter[GameData::Systems()[$child->getToken(2)]->getName()];
+						$action->setOnEnterMission($this);
 					$action->load($child, $this->name);
 				} else {
 					$action = new MissionAction($child, $this->name);
+					$action->setGenericOnEnterMission($this);
 					$this->genericOnEnter []= $action;
 				}
 			} else if ($child->getToken(0) == "on" && $child->size() >= 2) {
@@ -578,6 +606,7 @@ class Mission {
 				} else {
 					$trigger = self::$triggerNames[$child->getToken(1)];
 					$this->actions[$trigger->name]->load($child, $this->name);
+					$this->actions[$trigger->name]->setMission($this);
 				}	
 			} else {
 				$child->printTrace("Skipping unrecognized attribute:");
@@ -733,12 +762,12 @@ class Mission {
 			}
 			// Save any "on enter" actions that have not been performed.
 			foreach ($this->onEnter as $action) {
-				if (!in_array($action, $this->didEnter)) {
+				if (!$this->didEnter->contains($action)) {
 					$action->save($out);
 				}
 			}
 			foreach ($this->genericOnEnter as $action) {
-				if (!in_array($action, $this->didEnter)) {
+				if (!$this->didEnter->contains($action)) {
 					$action->save($out);
 				}
 			}
@@ -756,12 +785,95 @@ class Mission {
 		return $this->uuid;
 	}
 	
+	public function getTrueName(): string {
+		return $this->name;
+	}
+	
 	public function getName(): string {
 		return $this->displayName;
 	}
 	
 	public function getDescription(): string {
 		return $this->description;
+	}
+	
+	public function getLocation(): string {
+		return $this->location->value;
+	}
+	public function getAutosave(): bool {
+		return $this->autosave;
+	}
+	public function setAutosave(bool $autosave): self {
+		$this->autosave = $autosave;
+		return $this;
+	}
+	
+	public function setOverridesCapture(bool $overridesCapture): self {
+		$this->overridesCapture = $overridesCapture;
+		return $this;
+	}
+	
+	public function getDeadlineInt(): int {
+		return $this->deadlineInt;
+	}
+	public function setDeadlineInt(int $deadlineInt): self {
+		$this->deadlineInt = $deadlineInt;
+		return $this;
+	}
+	
+	public function setDeadline(Date $deadline): self {
+		$this->deadline = $deadline;
+		return $this;
+	}
+	
+	public function setExpectedJumps(int $expectedJumps): self {
+		$this->expectedJumps = $expectedJumps;
+		return $this;
+	}
+	
+	public function getDeadlineBase(): int {
+		return $this->deadlineBase;
+	}
+	public function setDeadlineBase(int $deadlineBase): self {
+		$this->deadlineBase = $deadlineBase;
+		return $this;
+	}
+	
+	public function getDeadlineMultiplier(): int {
+		return $this->deadlineMultiplier;
+	}
+	public function setDeadlineMultiplier(int $deadlineMultiplier): self {
+		$this->deadlineMultiplier = $deadlineMultiplier;
+		return $this;
+	}
+	
+	public function getClearance(): string {
+		return $this->clearance;
+	}
+	public function setClearance(string $clearance): self {
+		$this->clearance = $clearance;
+		return $this;
+	}
+	
+	public function getIgnoreClearance(): bool {
+		return $this->ignoreClearance;
+	}
+	public function setIgnoreClearance(bool $ignoreClearance): self {
+		$this->ignoreClearance = $ignoreClearance;
+		return $this;
+	}
+	
+	public function setHasFullClearance(bool $hasFullClearance): self {
+		$this->hasFullClearance = $hasFullClearance;
+		return $this;
+	}
+	
+	public function getRepeat(): int {
+		return $this->repeat;
+	}
+	public function setRepeat(int $repeat): self {
+		$this->repeat = $repeat;
+		return $this;
 	}
 	
 	// Check if this mission should be shown in your mission list. If not, the
@@ -823,9 +935,9 @@ class Mission {
 				return false;
 			}
 		}
-		if (!$this->clearanceFilter->isValid()) {
-			return false;
-		}
+		// if (!$this->clearanceFilter->isValid()) {
+		// 	return false;
+		// }
 	
 		// The instantiated NPCs should also be valid.
 		foreach ($this->getNPCs() as $npc) {
@@ -855,12 +967,20 @@ class Mission {
 	}
 	
 	// Information about what you are doing.
-	public function getSourceShip(): Ship {
+	public function getSourceShip(): ?Ship {
 		return $this->sourceShip;
 	}
 	
-	public function getDestination(): Planet {
+	public function getSourceFilter(): LocationFilter {
+		return $this->sourceFilter;
+	}
+	
+	public function getDestination(): ?Planet {
 		return $this->destination;
+	}
+	
+	public function getDestinationFilter(): LocationFilter {
+		return $this->destinationFilter;
 	}
 	
 	public function getWaypoints(): array {
@@ -934,7 +1054,7 @@ class Mission {
 		if ($planet == $this->destination || $this->stopovers->contains($planet) || $this->visitedStopovers->contains($planet)) {
 			return true;
 		}
-		return (!$this->clearanceFilter->isEmpty() && $this->clearanceFilter->matches($planet));
+		return (!$this->clearanceFilter->isEmpty() && $this->clearanceFilter->matchesPlanetSystem($planet));
 	}
 	
 	// Get the string to be shown in the destination planet's hailing dialog. If
@@ -949,6 +1069,30 @@ class Mission {
 		return $this->hasFullClearance;
 	}
 	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
 	// Check if it's possible to offer or complete this mission right now.
 	public function canOffer(PlayerInfo $player, Ship $boardingShip): bool {
 		if ($this->location == Location::BOARDING || $this->location == Location::ASSISTING) {
@@ -956,7 +1100,7 @@ class Mission {
 				return false;
 			}
 	
-			if (!$this->sourceFilter->matches($boardingShip)) {
+			if (!$this->sourceFilter->matchesShip($boardingShip)) {
 				return false;
 			}
 		} else {
@@ -964,7 +1108,7 @@ class Mission {
 				return false;
 			}
 	
-			if (!$this->sourceFilter->matches($player->getPlanet())) {
+			if (!$this->sourceFilter->matchesPlanetSystem($player->getPlanet())) {
 				return false;
 			}
 		}
@@ -978,7 +1122,7 @@ class Mission {
 			return false;
 		}
 		
-		$conditionCounts = array_count_values(array_keys($playerConditions));
+		$conditionCounts = array_count_values($playerConditions->keys());
 		if ($this->repeat && $conditionCounts[$this->name . ": offered"] >= $this->repeat) {
 			return false;
 		}
@@ -999,89 +1143,89 @@ class Mission {
 		return true;
 	}
 	
-	public function canAccept(PlayerInfo $player): bool {
-		$playerConditions = $player->getConditions();
-		if (!$this->toAccept->test($playerConditions)) {
-			return false;
-		}
+	// public function canAccept(PlayerInfo $player): bool {
+	// 	$playerConditions = $player->getConditions();
+	// 	if (!$this->toAccept->test($playerConditions)) {
+	// 		return false;
+	// 	}
 	
-		if (isset($this->actions[Trigger::OFFER]) && !$this->actions[Trigger::OFFER]->canBeDone($player)) {
-			return false;
-		}
-		if (isset($this->actions[Trigger::ACCEPT]) && !$this->actions[Trigger::ACCEPT]->canBeDone($player)) {
-			return false;
-		}
-		return $this->hasSpace($player);
-	}
+	// 	if (isset($this->actions[Trigger::OFFER]) && !$this->actions[Trigger::OFFER]->canBeDone($player)) {
+	// 		return false;
+	// 	}
+	// 	if (isset($this->actions[Trigger::ACCEPT]) && !$this->actions[Trigger::ACCEPT]->canBeDone($player)) {
+	// 		return false;
+	// 	}
+	// 	return $this->hasSpace($player);
+	// }
 	
-	public function hasSpace(PlayerInfo $player): bool {
-		$extraCrew = 0;
-		if ($player->getFlagship()) {
-			$extraCrew = $player->getFlagship()->getCrew() - $player->getFlagship()->getRequiredCrew();
-		}
-		return ($this->cargoSize <= $player->getCargo()->getFree() + $player->getCargo()->getCommoditiesSize()
-			&& $this->passengers <= $player->getCargo()->getBunksFree() + $extraCrew);
-	}
+	// public function hasSpace(PlayerInfo $player): bool {
+	// 	$extraCrew = 0;
+	// 	if ($player->getFlagship()) {
+	// 		$extraCrew = $player->getFlagship()->getCrew() - $player->getFlagship()->getRequiredCrew();
+	// 	}
+	// 	return ($this->cargoSize <= $player->getCargo()->getFree() + $player->getCargo()->getCommoditiesSize()
+	// 		&& $this->passengers <= $player->getCargo()->getBunksFree() + $extraCrew);
+	// }
 	
 	// Check if this mission's cargo can fit entirely on the referenced ship.
-	public function shipHasSpace(Ship $ship): bool {
-		return ($this->cargoSize <= $ship->getCargo()->getFree() && $this->passengers <= $ship->getCargo()->getBunksFree());
-	}
+	// public function shipHasSpace(Ship $ship): bool {
+	// 	return ($this->cargoSize <= $ship->getCargo()->getFree() && $this->passengers <= $ship->getCargo()->getBunksFree());
+	// }
 	
-	public function canComplete(PlayerInfo $player): bool {
-		if ($player->getPlanet() != $this->destination) {
-			return false;
-		}
+	// public function canComplete(PlayerInfo $player): bool {
+	// 	if ($player->getPlanet() != $this->destination) {
+	// 		return false;
+	// 	}
 	
-		return $this->isSatisfied($player);
-	}
+	// 	return $this->isSatisfied($player);
+	// }
 	
 	// This function dictates whether missions on the player's map are shown in
 	// bright or dim text colors, and may be called while in-flight or landed.
-	public function isSatisfied(PlayerInfo $player): bool {
-		if (count($this->waypoints) > 0 || count($this->stopovers) > 0) {
-			return false;
-		}
+	// public function isSatisfied(PlayerInfo $player): bool {
+	// 	if (count($this->waypoints) > 0 || count($this->stopovers) > 0) {
+	// 		return false;
+	// 	}
 	
-		// Test the completion conditions for this mission.
-		if (!$this->toComplete->test($player->getConditions())) {
-			return false;
-		}
+	// 	// Test the completion conditions for this mission.
+	// 	if (!$this->toComplete->test($player->getConditions())) {
+	// 		return false;
+	// 	}
 	
-		// Determine if any fines or outfits that must be transferred, can.
-		if (isset($this->actions[Trigger::COMPLETE]) && !$this->actions[Trigger::COMPLETE]->canBeDone($player)) {
-			return false;
-		}
+	// 	// Determine if any fines or outfits that must be transferred, can.
+	// 	if (isset($this->actions[Trigger::COMPLETE]) && !$this->actions[Trigger::COMPLETE]->canBeDone($player)) {
+	// 		return false;
+	// 	}
 	
-		// NPCs which must be accompanied or evaded must be present (or not),
-		// and any needed scans, boarding, or assisting must also be completed.
-		foreach ($this->npcs as $npc) {
-			if (!$npc->hasSucceeded($player->getSystem())) {
-				return false;
-			}
-		}
+	// 	// NPCs which must be accompanied or evaded must be present (or not),
+	// 	// and any needed scans, boarding, or assisting must also be completed.
+	// 	foreach ($this->npcs as $npc) {
+	// 		if (!$npc->hasSucceeded($player->getSystem())) {
+	// 			return false;
+	// 		}
+	// 	}
 	
-		// If any of the cargo for this mission is being carried by a ship that is
-		// not in this system, the mission cannot be completed right now.
-		foreach ($player->getShips() as $ship) {
-			// Skip in-system ships, and carried ships whose parent is in-system.
-			if ($ship->getSystem() == $player->getSystem() || (!$ship->getSystem() && $ship->canBeCarried()
-					&& $ship->getParent() && $ship->getParent()->getSystem() == $player->getSystem())) {
-				continue;
-			}
+	// 	// If any of the cargo for this mission is being carried by a ship that is
+	// 	// not in this system, the mission cannot be completed right now.
+	// 	foreach ($player->getShips() as $ship) {
+	// 		// Skip in-system ships, and carried ships whose parent is in-system.
+	// 		if ($ship->getSystem() == $player->getSystem() || (!$ship->getSystem() && $ship->canBeCarried()
+	// 				&& $ship->getParent() && $ship->getParent()->getSystem() == $player->getSystem())) {
+	// 			continue;
+	// 		}
 	
-			if ($ship->getCargo()->getPassengers($this)) {
-				return false;
-			}
-			// Check for all mission cargo, including that which has 0 mass.
-			$cargo = $ship->getCargo()->getMissionCargo();
-			if (isset($cargo[$this->name])) {
-				return false;
-			}
-		}
+	// 		if ($ship->getCargo()->getPassengers($this)) {
+	// 			return false;
+	// 		}
+	// 		// Check for all mission cargo, including that which has 0 mass.
+	// 		$cargo = $ship->getCargo()->getMissionCargo();
+	// 		if (isset($cargo[$this->name])) {
+	// 			return false;
+	// 		}
+	// 	}
 	
-		return true;
-	}
+	// 	return true;
+	// }
 	
 	public function getOverridesCapture(): bool {
 		return $this->overridesCapture;
@@ -1107,7 +1251,7 @@ class Mission {
 	
 	// Get a list of NPCs associated with this mission. Every time the player
 	// takes off from a planet, they should be added to the active ships.
-	public function getNPCs(): array {
+	public function getNPCs(): array|Collection {
 		return $this->npcs;
 	}
 	
@@ -1144,6 +1288,151 @@ class Mission {
 		}
 	
 		return true;
+	}
+	
+	public function toJSON($justArray=false): array|string {
+		$jsonArray = ['name'=>$this->name];
+		$jsonArray['id'] = $this->id;
+		
+		$jsonArray['displayName'] = $this->displayName;
+		$jsonArray['description'] = $this->description;
+		$jsonArray['blocked'] = $this->blocked;
+		$jsonArray['locationStr'] = $this->locationStr;
+		$jsonArray['hasFailed'] = $this->hasFailed;
+		$jsonArray['isVisible'] = $this->isVisible;
+		$jsonArray['hasPriority'] = $this->hasPriority;
+		$jsonArray['isMinor'] = $this->isMinor;
+		$jsonArray['autosave'] = $this->autosave;
+		$jsonArray['overridesCapture'] = $this->overridesCapture;
+		$jsonArray['deadlineInt'] = $this->deadlineInt;
+		$jsonArray['expectedJumps'] = $this->expectedJumps;
+		$jsonArray['deadlineBase'] = $this->deadlineBase;
+		$jsonArray['deadlineMultiplier'] = $this->deadlineMultiplier;
+		$jsonArray['clearance'] = $this->clearance;
+		$jsonArray['ignoreClearance'] = $this->ignoreClearance;
+		$jsonArray['hasFullClearance'] = $this->hasFullClearance;
+		$jsonArray['repeat'] = $this->repeat;
+		$jsonArray['cargo'] = $this->cargo;
+		$jsonArray['cargoSize'] = $this->cargoSize;
+		$jsonArray['cargoLimit'] = $this->cargoLimit;
+		$jsonArray['cargoProb'] = $this->cargoProb;
+		$jsonArray['illegalCargoFine'] = $this->illegalCargoFine;
+		$jsonArray['illegalCargoMessage'] = $this->illegalCargoMessage;
+		$jsonArray['failIfDiscovered'] = $this->failIfDiscovered;
+		$jsonArray['passengers'] = $this->passengers;
+		$jsonArray['passengerLimit'] = $this->passengerLimit;
+		$jsonArray['passengerProb'] = $this->passengerProb;
+		$jsonArray['paymentApparent'] = $this->paymentApparent;
+		$jsonArray['distanceCalcString'] = $this->distanceCalcString;
+		
+		$jsonArray['clearanceFilter'] = $this->clearanceFilter->toJSON(true);
+		$jsonArray['toOffer'] = $this->toOffer->toJSON(true);
+		$jsonArray['toAccept'] = $this->toAccept->toJSON(true);
+		$jsonArray['toComplete'] = $this->toComplete->toJSON(true);
+		$jsonArray['toFail'] = $this->toFail->toJSON(true);
+
+		$jsonArray['isUnlockedBy'] = [];
+		foreach ($this->isUnlockedBy as $name => $IsUnlockedBy) {
+			if ($IsUnlockedBy['type'] == 'event') {
+				$jsonArray['isUnlockedBy'][$name] = $IsUnlockedBy;
+			} else if ($IsUnlockedBy['type'] == 'attribute') {
+				$jsonArray['isUnlockedBy'][$name] = $IsUnlockedBy;
+			} else {
+				$IsUnlockedBy['missionName'] = $IsUnlockedBy['mission']->getName();
+				unset($IsUnlockedBy['mission']);
+				$jsonArray['isUnlockedBy'][$name] = $IsUnlockedBy;
+			}
+		}
+		$jsonArray['unlocksOn'] = [];
+		foreach ($this->unlocksOn as $name => $UnlocksOn) {
+			if ($UnlocksOn['type'] == 'event') {
+				$jsonArray['unlocksOn'][$name] = $UnlocksOn;
+			} else if ($UnlocksOn['type'] == 'attribute') {
+				$jsonArray['unlocksOn'][$name] = $UnlocksOn;
+			} else {
+				$UnlocksOn['missionName'] = $UnlocksOn['mission']->getName();
+				unset($UnlocksOn['mission']);
+				$jsonArray['unlocksOn'][$name] = $UnlocksOn;
+			}
+		}
+		$jsonArray['isBlockedBy'] = [];
+		foreach ($this->isBlockedBy as $name => $IsBlockedBy) {
+			if ($IsBlockedBy['type'] == 'event') {
+				$jsonArray['isBlockedBy'][$name] = $IsBlockedBy;
+			} else if ($IsBlockedBy['type'] == 'attribute') {
+				$jsonArray['isBlockedBy'][$name] = $IsBlockedBy;
+			} else {
+				$IsBlockedBy['missionName'] = $IsBlockedBy['name'];
+				unset($IsBlockedBy['mission']);
+				$jsonArray['isBlockedBy'][$name] = $IsBlockedBy;
+			}
+		}
+		$jsonArray['blocksOn'] = [];
+		foreach ($this->blocksOn as $name => $BlocksOn) {
+			if ($BlocksOn['type'] == 'event') {
+				$jsonArray['blocksOn'][$name] = $BlocksOn;
+			} else if ($BlocksOn['type'] == 'attribute') {
+				$jsonArray['blocksOn'][$name] = $BlocksOn;
+			} else {
+				$BlocksOn['missionName'] = $BlocksOn['mission']->getName();
+				unset($BlocksOn['mission']);
+				$jsonArray['blocksOn'][$name] = $BlocksOn;
+			}
+		}
+		$jsonArray['triggersEventsOn'] = $this->triggersEventsOn;
+		
+		$jsonArray['sourceFilter'] = $this->sourceFilter->toJSON(true);
+		$jsonArray['destinationFilter'] = $this->destinationFilter->toJSON(true);
+		
+		$jsonArray['source'] = $this->source?->getName();
+		$jsonArray['sourceShip'] = $this->sourceShip?->toJSON(true);
+		$jsonArray['destination'] = $this->destination?->getName();
+		
+		$jsonArray['waypoints'] = [];
+		foreach ($this->waypoints as $WaypointSystem) {
+			$jsonArray['waypoints'] []= $WaypointSystem->getName();
+		}
+		$jsonArray['waypointFilters'] = [];
+		foreach ($this->waypointFilters as $WaypointFilter) {
+			$jsonArray['waypointFilters'] []= $WaypointFilter->toJSON(true);
+		}
+		$jsonArray['stopovers'] = [];
+		foreach ($this->stopovers as $StopoverPlanet) {
+			$jsonArray['stopovers'] []= $StopoverPlanet->getName();
+		}
+		$jsonArray['stopoverFilters'] = [];
+		foreach ($this->stopoverFilters as $StopoverFilter) {
+			$jsonArray['stopoverFilters'] []= $StopoverFilter->toJSON(true);
+		}
+		$jsonArray['substitutions'] = $this->substitutions->toJSON(true);
+		
+		$jsonArray['npcs'] = [];
+		foreach ($this->npcs as $NPC) {
+			$jsonArray['npcs'] []= $NPC->toJSON(true);
+		}
+		
+		$jsonArray['actions'] = [];
+		foreach ($this->actions as $trigger => $Action) {
+			$jsonArray['actions'][$trigger] = $Action->toJSON(true);
+		}
+		
+		$jsonArray['onEnter'] = [];
+		foreach ($this->onEnter as $systemName => $Action) {
+			$jsonArray['onEnter'][$systemName] = $Action->toJSON(true);
+		}
+		
+		$jsonArray['genericOnEnter'] = [];
+		foreach ($this->genericOnEnter as $goeAction) {
+			$jsonArray['genericOnEnter'] = $goeAction->toJSON(true);
+		}
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		
+		return json_encode($jsonArray);
 	}
 
 }

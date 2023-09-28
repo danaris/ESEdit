@@ -31,9 +31,14 @@ class MissionAction {
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Phrase', cascade: ['persist'])]
 	#[ORM\JoinColumn(nullable: false, name: 'dialogPhraseId')]
 	private Phrase $dialogPhrase; //ExclusiveItem<Phrase>
-	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Conversation', cascade: ['persist'])]
-	#[ORM\JoinColumn(nullable: false, name: 'conversationId')]
-	private Conversation $conversation; //ExclusiveItem<Conversation>
+	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Conversation', inversedBy: 'missionAction', cascade: ['persist'])]
+	#[ORM\JoinColumn(nullable: true, name: 'conversationId')]
+	private ?Conversation $conversation = null; //ExclusiveItem<Conversation>
+
+	private ?Conversation $namedConversation = null;
+	
+	#[ORM\Column(type: 'string', nullable: true)]
+	private ?string $conversationName = null;
 	
 	// Outfits that are required to be owned (or not) for this action to be performable.
 	private array $requiredOutfits = []; //map<const Outfit *, int>
@@ -84,7 +89,6 @@ class MissionAction {
 	public function __construct(?DataNode $node = null, string $missionName = '') {
 		$this->action = new GameAction();
 		$this->systemFilter = new LocationFilter();
-		$this->conversation = new Conversation();
 		$this->dialogPhrase = new Phrase();
 		if ($node && $missionName) {
 			$this->load($node, $missionName);
@@ -93,6 +97,26 @@ class MissionAction {
 	
 	public function getAction(): GameAction {
 		return $this->action;
+	}
+	
+	public function getTrigger(): string {
+		return $this->trigger;
+	}
+	
+	public function getSystem(): string {
+		return $this->system;
+	}
+	
+	public function getDialogText(): string {
+		return $this->dialogText;
+	}
+	
+	public function getConversation(bool $onlyConvo=false): ?Conversation {
+		if ($this->conversation || $onlyConvo) {
+			return $this->conversation;
+		} else {
+			return $this->namedConversation;
+		}
 	}
 	
 	public function load(DataNode $node, string $missionName) {
@@ -132,7 +156,8 @@ class MissionAction {
 		} else if ($key == "conversation" && $child->hasChildren()) {
 			$this->conversation = new Conversation($child, $missionName);
 		} else if ($key == "conversation" && $hasValue) {
-			$this->conversation = GameData::Conversations()[$child->getToken(1)];
+			$this->namedConversation = GameData::Conversations()[$child->getToken(1)];
+			$this->conversationName = $child->getToken(1);
 		} else if ($key == "require" && $hasValue) {
 			$count = ($child->size() < 3 ? 1 : intval($child->getValue(2)));
 			if ($count >= 0) {
@@ -170,8 +195,6 @@ class MissionAction {
 		$out->endChild();
 	}
 	
-	
-	
 	public function saveBody(DataWriter $out): void {
 		if (!$this->systemFilter->isEmpty()) {
 			$out->write("system");
@@ -190,7 +213,7 @@ class MissionAction {
 			//}
 			$out->endChild();
 		}
-		if (!$this->conversation->isEmpty()) {
+		if (!$this->conversation?->isEmpty()) {
 			$this->conversation->save($out);
 		}
 		foreach ($this->requiredOutfits as $outfitName => $outfitCount) {
@@ -406,7 +429,42 @@ class MissionAction {
 	
 	
 	public function getPayment(): int {
-		return action.Payment();
+		return $this->action->getPayment();
+	}
+	
+	public function toJSON($justArray=false): array|string {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id; // int
+		$jsonArray['trigger'] = $this->trigger; // string
+		$jsonArray['system'] = $this->system; // string
+		$jsonArray['systemFilter'] = $this->systemFilter->toJSON(true); // LocationFilter
+		$jsonArray['dialogText'] = $this->dialogText; // string
+		$jsonArray['dialogPhrase'] = $this->dialogPhrase->toJSON(true); // Phrase
+		$jsonArray['conversation'] = $this->conversation?->toJSON(true); // ?Conversation 
+		$jsonArray['conversationName'] = $this->conversationName; // ?string
+		$jsonArray['requiredOutfits'] = $this->requiredOutfits; // array 	
+		$jsonArray['action'] = $this->action->toJSON(true); // GameAction
+		
+		//$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		
+		return json_encode($jsonArray);
+	}
+	
+	public function setMission(?Mission $mission): void {
+		$this->mission = $mission;
+	}
+	
+	public function setOnEnterMission(?Mission $mission): void {
+		$this->onEnterMission = $mission;
+	}
+	
+	public function setGenericOnEnterMission(?Mission $mission): void {
+		$this->genericOnEnterMission = $mission;
 	}
 
 }

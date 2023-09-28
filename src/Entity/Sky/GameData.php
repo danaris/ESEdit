@@ -31,6 +31,9 @@ class GameData {
 	public static function Objects(): ?UniverseObjects {
 		return self::$objects;
 	}
+	public static function SetObjects(?UniverseObjects $objects): void {
+		self::$objects = $objects;
+	}
 	
 	public static function Colors(): TemplatedArray {
 		if (count(self::$objects->colors) == 0 && self::PlayerGovernment() != null) {
@@ -38,10 +41,10 @@ class GameData {
 		}
 		return self::$objects->colors;
 	}
-	public static function Commodities(): TemplatedArray {
-		if (count(self::$objects->trade->getCommodities()) == 0 && self::PlayerGovernment() != null) {
-			self::$objects->trade->getCommodities()->initContents();
-		}
+	public static function Commodities(): array {
+		// if (count(self::$objects->trade->getCommodities()) == 0 && self::PlayerGovernment() != null) {
+		// 	self::$objects->trade->getCommodities()->initContents();
+		// }
 		return self::$objects->trade->getCommodities();
 	}
 	public static function Conversations(): TemplatedArray {
@@ -68,12 +71,12 @@ class GameData {
 		}
 		return self::$objects->fleets;
 	}
-	public static function Formations(): TemplatedArray {
-		if (count(self::$objects->formations) == 0 && self::PlayerGovernment() != null) {
-			self::$objects->formations->initContents();
-		}
-		return self::$objects->formations;
-	}
+	// public static function Formations(): TemplatedArray {
+	// 	if (count(self::$objects->formations) == 0 && self::PlayerGovernment() != null) {
+	// 		self::$objects->formations->initContents();
+	// 	}
+	// 	return self::$objects->formations;
+	// }
 	public static function Galaxies(): TemplatedArray {
 		if (count(self::$objects->galaxies) == 0 && self::PlayerGovernment() != null) {
 			self::$objects->galaxies->initContents();
@@ -110,12 +113,12 @@ class GameData {
 		}
 		return self::$objects->missions;
 	}
-	public static function SpaceportNews(): TemplatedArray {
-		if (count(self::$objects->spaceportNews) == 0 && self::PlayerGovernment() != null) {
-			self::$objects->spaceportNews->initContents();
-		}
-		return self::$objects->spaceportNews;
-	}
+	// public static function SpaceportNews(): TemplatedArray {
+	// 	if (count(self::$objects->spaceportNews) == 0 && self::PlayerGovernment() != null) {
+	// 		self::$objects->spaceportNews->initContents();
+	// 	}
+	// 	return self::$objects->spaceportNews;
+	// }
 	public static function Outfits(): TemplatedArray {
 		if (count(self::$objects->outfits) == 0 && self::PlayerGovernment() != null) {
 			self::$objects->outfits->initContents();
@@ -184,18 +187,20 @@ class GameData {
 		foreach (self::$sources as $source) {
 			// All names will only include the portion of the path that comes after
 			// this directory prefix.
-			$directoryPath = $source . "images/";
+			$directoryPath = $source['dir'] . "images/";
 			$start = strlen($directoryPath);
 	
 			$imageFiles = Files::RecursiveList($directoryPath);
 			foreach ($imageFiles as $path) {
+				$imageFilename = substr($path, strlen($directoryPath));
 				if (ImageSet::IsImage($path)) {
 					$name = ImageSet::Name(substr($path, $start));
 					
 					if (!isset($images[$name])) {
 						$images[$name] = new ImageSet($name);
 					}
-					$images[$name]->add($path);
+					$images[$name]->add($imageFilename);
+					$images[$name]->setSource(['name'=>$source['name'],'file'=>$imageFilename,'version'=>$source['version']]);
 				}
 			}
 		}

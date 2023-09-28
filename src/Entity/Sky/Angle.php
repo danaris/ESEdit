@@ -13,6 +13,7 @@ class Angle {
 	const MASK = self::STEPS - 1;
 	const DEG_TO_STEP = self::STEPS / 360.;
 	const STEP_TO_RAD = M_PI / (self::STEPS / 2);
+	const TO_DEG = 180. / M_PI;
 	
 	// Get a random angle.
 	public static function Random(?float $range = null) {
@@ -20,7 +21,7 @@ class Angle {
 			return new Angle(intval(Random::Int(self::STEPS)));
 		} else {
 			$mod = intval(abs($range) * self::DEG_TO_STEP) + 1;
-			return new Angle($mod ? int(Random::Int($mod)) & self::MASK : 0);
+			return new Angle($mod ? Random::Int($mod) & self::MASK : 0);
 		}
 	}
 	

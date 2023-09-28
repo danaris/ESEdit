@@ -7,6 +7,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Event\PostLoadEventArgs;
+use ApiPlatform\Metadata\ApiResource;
 
 use App\Entity\DataNode;
 use App\Entity\DataWriter;
@@ -21,6 +22,7 @@ use App\Entity\DataWriter;
 #[ORM\Entity]
 #[ORM\Table(name: 'GameAction')]
 #[ORM\HasLifecycleCallbacks]
+#[ApiResource]
 class GameAction {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -35,7 +37,7 @@ class GameAction {
 	private string $specialLogTextStr;
 	private array $specialLogText = []; // map<string, map<string, string>>
 	
-	#[ORM\OneToMany(targetEntity: 'App\Entity\Sky\EventTrigger', mappedBy: 'gameAction')]
+	#[ORM\OneToMany(targetEntity: 'App\Entity\Sky\EventTrigger', mappedBy: 'gameAction', cascade: ['persist'])]
 	private Collection $eventTriggers;
 	
 	private array $events = []; // map<const GameEvent *, pair<int, int>> change to $eventName => ['event'=>$event, 'minDays'=>$minDays, 'maxDays'=>$maxDays]
@@ -49,8 +51,21 @@ class GameAction {
 	// When this action is performed, the missions with these names fail.
 	private array $fail = []; // set<string>
 	
-	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\ConditionSet', mappedBy: 'conversationAction', cascade: ['persist'])]
+	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\ConditionSet', inversedBy: 'conversationAction', cascade: ['persist'])]
 	private ConditionSet $conditions;
+	
+	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Node', inversedBy: 'actions', cascade: ['persist'])]
+	public Node $conversationNode;
+	
+	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\MissionAction', mappedBy: 'action', cascade: ['persist'])]
+	private MissionAction $missionAction;
+	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
 	
 	// Construct and Load() at the same time.
 	public function __construct(?DataNode $node = null, ?string $missionName = null) {
@@ -61,11 +76,88 @@ class GameAction {
 		}
 	}
 	
+	public function getId(): int {
+		return $this->id;
+	}
+	public function setId(int $id): self {
+		$this->id = $id;
+		return $this;
+	}
+	
+	public function getIsEmpty(): bool {
+		return $this->isEmpty;
+	}
+	public function setIsEmpty(bool $isEmpty): self {
+		$this->isEmpty = $isEmpty;
+		return $this;
+	}
+	
+	public function getLogText(): string {
+		return $this->logText;
+	}
+	public function setLogText(string $logText): self {
+		$this->logText = $logText;
+		return $this;
+	}
+	
+	public function getSpecialLogTextStr(): string {
+		return $this->specialLogTextStr;
+	}
+	public function setSpecialLogTextStr(string $specialLogTextStr): self {
+		$this->specialLogTextStr = $specialLogTextStr;
+		return $this;
+	}
+	
+	public function getEventTriggers(): Collection {
+		return $this->eventTriggers;
+	}
+	public function setEventTriggers(Collection $eventTriggers): self {
+		$this->eventTriggers = $eventTriggers;
+		return $this;
+	}
+	
+	public function getConditions(): ConditionSet {
+		return $this->conditions;
+	}
+	public function setConditions(ConditionSet $conditions): self {
+		$this->conditions = $conditions;
+		return $this;
+	}
+	
 	public function getEvents(): array {
 		return $this->events;
 	}
 	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
 	public function load(DataNode $node, string $missionName) {
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
 		foreach ($node as $child) {
 			$this->loadSingle($child, $missionName);
 		}
@@ -127,7 +219,6 @@ class GameAction {
 				$minDays = $maxDays;
 				$maxDays = $tmp;
 			}
-			// TODO: Similarly here, I think we'll need to make something else the key
 			$eventName = $child->getToken(1);
 			$event = GameData::Events()[$eventName];
 			$this->events[$eventName] = ['event'=>$event, 'minDays'=>$minDays, 'maxDays'=>$maxDays];
@@ -151,7 +242,7 @@ class GameAction {
 			$out->beginChild();
 			//{
 				// Break the text up into paragraphs.
-				$paragraphs = explode("\n	", $logText);
+				$paragraphs = explode("\n	", $this->logText);
 				foreach ($paragraphs as $line) {
 					$out->write($line);
 				}
@@ -242,6 +333,14 @@ class GameAction {
 	public function getShips(): array {
 		return $this->giftShips;
 	}
+	
+	public function getConversationNode(): Node {
+		return $this->conversationNode;
+	}
+	
+	public function setConversationNode(Node $node) {
+		$this->conversationNode = $node;
+	}
 	// 
 	// // Perform the specified tasks.
 	// void GameAction::Do(PlayerInfo &player, UI *ui) const
@@ -329,7 +428,7 @@ class GameAction {
 		}
 	
 		if ($this->logText != '') {
-			$result->logText = Format::Replace($logText, $subs);
+			$result->logText = Format::Replace($this->logText, $subs);
 		}
 		foreach ($this->specialLogText as $key => $specialText) {
 			foreach ($specialText as $specialKey => $specialVal) {
@@ -347,11 +446,66 @@ class GameAction {
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
 		$this->specialLogTextStr = json_encode($this->specialLogText);
+		$handledEvents = [];
+		foreach ($this->eventTriggers as $EventTrigger) {
+			$Event = $EventTrigger->getEvent();
+			$handled = false;
+			if ($Event && isset($this->events[$Event->getName()])) {
+				$eventData = $this->events[$Event->getName()];
+				if ($EventTrigger->getMinDays() != $eventData['minDays']) {
+					$EventTrigger->setMinDays($eventData['minDays']);
+				}
+				if ($EventTrigger->getMaxDays() != $eventData['maxDays']) {
+					$EventTrigger->setMaxDays($eventData['maxDays']);
+				}
+				$handledEvents []= $Event->getName();
+				$handled = true;
+			}
+			if (!$handled) {
+				$eventArgs->getObjectManager()->remove($EventTrigger);
+			}
+		}
+		foreach ($this->events as $eventName => $eventData) {
+			if (in_array($eventName, $handledEvents)) {
+				continue;
+			}
+			$EventTrigger = new EventTrigger();
+			$EventTrigger->setGameAction($this);
+			$EventTrigger->setEvent($eventData['event']);
+			$EventTrigger->setMinDays($eventData['minDays']);
+			$EventTrigger->setMaxDays($eventData['maxDays']);
+			$this->eventTriggers []= $EventTrigger;
+		}
 	}
 	
 	#[ORM\PostLoad]
 	public function fromDatabase(PostLoadEventArgs $eventArgs) {
 		$this->specialLogText = json_decode($this->specialLogTextStr, true);
+		foreach ($this->eventTriggers as $EventTrigger) {
+			$Event = $EventTrigger->getEvent();
+			$this->events[$Event->getName()] = ['event'=>$Event, 'minDays'=>$EventTrigger->getMinDays(), 'maxDays'=>$EventTrigger->getMaxDays()];
+		}
+	}
+	
+	public function toJSON(bool $justArray=false): string|array {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		$jsonArray['isEmpty'] = $this->isEmpty;
+		$jsonArray['logText'] = $this->logText;
+		$jsonArray['specialLogText'] = $this->specialLogText;
+		
+		$jsonArray['events'] = [];
+		foreach ($this->events as $eventName => $eventData) {
+			$jsonArray['events'][$eventName] = ['minDays'=>$eventData['minDays'], 'maxDays'=>$eventData['maxDays']];
+		}
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		return json_encode($jsonArray);
 	}
 
 }

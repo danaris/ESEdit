@@ -8,7 +8,7 @@ use App\Entity\DataNode;
 use App\Entity\DataWriter;
 
 #[ORM\Entity]
-#[ORM\Table(name: 'NPCACtion')]
+#[ORM\Table(name: 'NPCAction')]
 class NPCAction {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -23,6 +23,10 @@ class NPCAction {
 	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\MissionAction', cascade: ['persist'])]
 	#[ORM\JoinColumn(nullable: false)]
 	private MissionAction $action;
+
+    #[ORM\ManyToOne(inversedBy: 'npcActionCollection')]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?NPC $npc = null;
 	
 	// Construct and Load() at the same time.
 	public function __construct(?DataNode $node = null, ?string $missionName = null) {
@@ -97,5 +101,31 @@ class NPCAction {
 	// 	result.action = action.Instantiate(subs, origin, jumps, payload);
 	// 	return result;
 	// }
+	
+	public function toJSON($justArray=false): array|string {
+		$jsonArray = [];
+		$jsonArray['id'] = $this->id;
+         
+		$jsonArray['trigger'] = $this->trigger;
+		$jsonArray['action'] = $this->action->toJSON(true);
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		
+		return json_encode($jsonArray);
+	}
+
+    public function getNpc(): ?NPC
+    {
+        return $this->npc;
+    }
+
+    public function setNpc(?NPC $npc): static
+    {
+        $this->npc = $npc;
+
+        return $this;
+    }
 
 }

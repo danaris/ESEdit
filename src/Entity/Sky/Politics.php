@@ -13,19 +13,19 @@ class Politics {
 	private array $fined = []; //std::set<const Government *> 
 	
 	// Check if the ship evades being cargo scanned.
-	public static function EvadesCargoScan(Ship $ship): bool {
-		// Illegal goods can be hidden inside legal goods to avoid detection.
-		$contraband = $ship->getCargo()->getIllegalCargoAmount();
-		$netIllegalCargo = $contraband - $ship.getAttributes()["scan concealment"];
-		if ($netIllegalCargo <= 0) {
-			return true;
-		}
+	// public static function EvadesCargoScan(Ship $ship): bool {
+	// 	// Illegal goods can be hidden inside legal goods to avoid detection.
+	// 	$contraband = $ship->getCargo()->getIllegalCargoAmount();
+	// 	$netIllegalCargo = $contraband - $ship.getAttributes()["scan concealment"];
+	// 	if ($netIllegalCargo <= 0) {
+	// 		return true;
+	// 	}
 
-		$legalGoods = $ship.getCargo().getUsed() - $contraband;
-		$illegalRatio = $legalGoods ? max(1., 2. * $netIllegalCargo / $legalGoods) : 1.;
-		$scanChance = $illegalRatio / (1. + $ship->getAttributes()["scan interference"]);
-		return Random::Real() > $scanChance;
-	}
+	// 	$legalGoods = $ship.getCargo().getUsed() - $contraband;
+	// 	$illegalRatio = $legalGoods ? max(1., 2. * $netIllegalCargo / $legalGoods) : 1.;
+	// 	$scanChance = $illegalRatio / (1. + $ship->getAttributes()["scan interference"]);
+	// 	return Random::Real() > $scanChance;
+	// }
 
 	// Check if the ship evades being outfit scanned.
 	public static function EvadesOutfitScan(Ship $ship) {
@@ -152,11 +152,11 @@ class Politics {
 		if (in_array($planet, $this->bribedPlanets)) {
 			return true;
 		}
-		if (in_array($planet->getGovernment(), $planet->getGovernment())) {
+		if (in_array($planet->getGovernment(), $this->provoked)) {
 			return false;
 		}
 		
-		return $this->reputation($planet->GetGovernment()) >= $planet->getRequiredReputation();
+		return $this->reputationWith[$planet->GetGovernment()] >= $planet->getRequiredReputation();
 	}
 	
 	

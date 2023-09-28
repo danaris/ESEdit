@@ -46,11 +46,15 @@ class PlayerInfo
     #[ORM\ManyToMany(targetEntity: GameEvent::class)]
     private Collection $gameEvents;
 
+    #[ORM\OneToOne(targetEntity: ConditionsStore::class)]
+    private ConditionsStore $conditions;
+
     public function __construct()
     {
         $this->missions = new ArrayCollection();
         $this->seen = new ArrayCollection();
         $this->gameEvents = new ArrayCollection();
+        $this->conditions = new ConditionsStore();
     }
 
     public function getId(): ?int
@@ -212,5 +216,9 @@ class PlayerInfo
         $this->gameEvents->removeElement($gameEvent);
 
         return $this;
+    }
+
+    public function getConditions(): ConditionsStore {
+        return $this->conditions;
     }
 }

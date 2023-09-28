@@ -35,6 +35,13 @@ class Fleet {
 	private Personality $personality;
 	private Personality $fighterPersonality;
 	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
+	
 	// public:
 	// 	Fleet() = default;
 	// 	// Construct and Load() at the same time.
@@ -55,6 +62,30 @@ class Fleet {
 	// Get the government of this fleet.
 	public function getGovernment(): ?Government {
 		return $this->government;
+	}
+	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
 	}
 	// 
 	// 	// Choose a fleet to be created during flight, and have it enter the system via jump or planetary departure.

@@ -24,7 +24,7 @@ class DistanceCalculationSettings {
 	
 	public static function SettingsFromString(string $string): DistanceCalculationSettings {
 		$settingsArray = json_decode($string, true);
-		return new DistanceCalculationSettings($settingsArray['strategy'], $settingsArray['jumpDrive']);
+		return new DistanceCalculationSettings(strategy: $settingsArray['strategy'], jumpDrive: $settingsArray['jumpDrive']);
 	}
 	
 	public function __construct(?DataNode $node = null, ?string $strategy = null, ?bool $jumpDrive = null) {

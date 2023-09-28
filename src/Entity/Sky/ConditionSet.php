@@ -7,12 +7,14 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Event\PostLoadEventArgs;
+use ApiPlatform\Metadata\ApiResource;
 
 use App\Entity\DataNode;
 use App\Entity\DataWriter;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'ConditionSet')]
+#[ApiResource]
 class ConditionSet {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -38,6 +40,22 @@ class ConditionSet {
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\ConditionSet', inversedBy: 'children', cascade: ['persist'])]
 	#[ORM\JoinColumn(nullable: true, name: 'parentId')]
 	private $parent;
+	
+	#[ORM\OneToOne(targetEntity: GameAction::class, mappedBy: 'conditions', cascade: ['persist'])]
+	private GameAction $conversationAction;
+	
+	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Node', inversedBy: 'conditions', cascade: ['persist'])]
+	public Node $conversationNode;
+	
+	#[ORM\OneToOne(targetEntity: Element::class, inversedBy: 'conditions', cascade: ['persist'])]
+	public Element $conversationNodeElement;
+	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
 	
 	static string $UNRECOGNIZED = "Warning: Unrecognized condition expression:";
 	static string $UNREPRESENTABLE = "Error: Unrepresentable condition value encountered:";
@@ -216,7 +234,7 @@ class ConditionSet {
 				if ($temp[0]) {
 					$value = $temp[1];
 				} else {
-					$perm = $conditions->hasGet(str);
+					$perm = $conditions->hasGet($str);
 					if ($perm[0]) {
 						$value = $perm[1];
 					}
@@ -287,6 +305,41 @@ class ConditionSet {
 		}
 	}
 	
+	public function getId(): int {
+		return $this->id;
+	}
+	public function setId(int $id): self {
+		$this->id = $id;
+		return $this;
+	}
+	
+	public function getIsOr(): bool {
+		return $this->isOr;
+	}
+	public function setIsOr(bool $isOr): self {
+		$this->isOr = $isOr;
+		return $this;
+	}
+	
+	public function getHasAssign(): bool {
+		return $this->hasAssign;
+	}
+	public function setHasAssign(bool $hasAssign): self {
+		$this->hasAssign = $hasAssign;
+		return $this;
+	}
+	
+	public function setExpressions(Collection $expressions): self {
+		$this->expressions = $expressions;
+		return $this;
+	}
+	
+	public function setChildren(Collection $children): self {
+		$this->children = $children;
+		return $this;
+	}
+
+	
 	public function getExpressions(): array {
 		return $this->expressions->toArray();
 	}
@@ -295,9 +348,54 @@ class ConditionSet {
 		return $this->children->toArray();
 	}
 	
+	public function getConversationNode(): Node {
+		return $this->conversationNode;
+	}
+	
+	public function setConversationNode(Node $node) {
+		$this->conversationNode = $node;
+	}
+	
+	public function getConversationNodeElement(): Element {
+		return $this->conversationNodeElement;
+	}
+	
+	public function setConversationNodeElement(Element $element) {
+		$this->conversationNodeElement = $element;
+	}
+	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
 	// Load a set of conditions from the children of this node.
 	public function load(DataNode $node): void {
 		$this->isOr = ($node->getToken(0) == "or");
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
 		foreach ($node as $child) {
 			$this->add(node: $child);
 		}
@@ -358,6 +456,7 @@ class ConditionSet {
 			// The "and" and "or" keywords introduce a nested condition set.
 			$newSet = new ConditionSet($node);
 			$this->children []= $newSet;
+			$newSet->parent = $this;
 			// If a child node has assignment operators, warn on load since
 			// these will be processed after all non-child expressions.
 			if ($newSet->hasAssign) {
@@ -404,7 +503,7 @@ class ConditionSet {
 			$lastExpression = $this->expressions[array_key_last($this->expressions->toArray())];
 			if ($lastExpression->isEmpty()) {
 				$node->printTrace("Warning: Condition parses to an empty set:");
-				array_pop($this->expressions);
+				$this->expressions->removeElement($lastExpression);
 			}
 		}
 	}
@@ -489,7 +588,7 @@ class ConditionSet {
 	public function apply(ConditionsStore $conditions): void {
 		$unused = new ConditionsStore();
 		foreach ($this->expressions as $expression) {
-			if (!$this->expression->isTestable()) {
+			if (!$expression->isTestable()) {
 				$expression->apply($conditions, $unused);
 			}
 		}
@@ -505,7 +604,7 @@ class ConditionSet {
 		// Add the names from the expressions.
 		// TODO: also sub-expressions?
 		foreach ($this->expressions as $expr) {
-			$result []= $expr.Name();
+			$result []= $expr->getName();
 		}
 		// Add the names from the children.
 		foreach ($this->children as $child) {
@@ -514,6 +613,94 @@ class ConditionSet {
 			}
 		}
 		return $result;
+	}
+
+	// Check if this set is satisfied by either the created, temporary conditions, or the given conditions.
+	public function testSet(ConditionsStore &$conditions, ConditionsStore &$created): bool {
+		// Not all expressions may be testable: some may have been used to form the "created" condition map.
+		foreach ($this->expressions as $expression) {
+			if ($expression->isTestable()) {
+				$result = $expression->test($conditions, $created);
+				// If this is a set of "and" conditions, bail out as soon as one of them
+				// returns false. If it is an "or", bail out if anything returns true.
+				if ($result == $this->isOr) {
+					return $result;
+				}
+			}
+		}
+
+		foreach ($this->children as $child) {
+			$result = $child->testSet($conditions, $created);
+			if ($result == $this->isOr) {
+				return $result;
+			}
+		}
+		// If this is an "and" condition, all the above conditions were true, so return
+		// true. If it is an "or," no condition returned true, so return false.
+		return !$this->isOr;
+	}
+
+	// Construct new, temporary conditions based on the assignment expressions in
+	// this ConditionSet and the values in the player's conditions map.
+	public function testApply(ConditionsStore &$conditions, ConditionsStore &$created): void {
+		foreach ($this->expressions as $expression) {
+			if (!$expression->isTestable()) {
+				$expression->testApply($conditions, $created);
+			}
+		}
+		foreach ($this->children as $child) {
+			$child->testApply($conditions, $created);
+		}
+	}
+	
+	public function toJSON(bool $justArray=false): string|array {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		$jsonArray['isOr'] = $this->isOr;
+		$jsonArray['hasAssign'] = $this->hasAssign;
+		
+		$jsonArray['expressions'] = [];
+		foreach ($this->expressions as $Expression) {
+			$jsonArray['expressions'] []= $Expression->toJSON(true);
+		}
+		
+		$jsonArray['children'] = [];
+		foreach ($this->children as $Child) {
+			$jsonArray['children'] []= $Child->toJSON(true);
+		}
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		return json_encode($jsonArray);
+	}
+	
+	public function setFromJSON(string|array $jsonArray): void {
+		if (!is_array($jsonArray)) {
+			$jsonArray = json_decode($jsonArray, true);
+		}
+		
+		$this->isOr = $jsonArray['isOr'];
+		
+		if (isset($jsonArray['expressions'])) {
+			foreach ($jsonArray['expressions'] as $expArray) {
+				$Expression = new Expression($expArray['left'], $expArray['op'], $expArray['right']);
+				$Expression->setConditionSet($this);
+				$this->expressions []= $Expression;
+			}
+		}
+		
+		if (isset($jsonArray['children'])) {
+			foreach ($jsonArray['children'] as $childArray) {
+				$Child = new ConditionSet();
+				$Child->setFromJSON($childArray);
+				$Child->setParent($this);
+				$this->children []= $Child;
+			}
+		}
 	}
 }
 
@@ -633,19 +820,33 @@ class Expression {
 	public function test(ConditionsStore $conditions, ConditionsStore $created): bool {
 		$lhs = $this->left->evaluate($conditions, $created);
 		$rhs = $this->right->evaluate($conditions, $created);
-		return $this->fun($lhs, $rhs);
+		return ($this->fun)($lhs, $rhs);
 	}
 
 	// Assign the computed value to the desired condition.
 	public function apply(ConditionsStore $conditions, ConditionsStore $created): void {
 		$value = $this->right->evaluate($conditions, $created);
-		$conditions[$this->getName()] = $this->fun($conditions[$this->getName()], $value);
+		$conditions[$this->getName()] = ($this->fun)($conditions[$this->getName()], $value);
 	}
 
 	// Assign the computed value to the desired temporary condition.
 	public function testApply(ConditionsStore $conditions, ConditionsStore $created): void {
 		$value = $this->right->evaluate($conditions, $created);
-		$created[$this->getName()] = $this->fun($created[$this->getName()], $value);
+		$created[$this->getName()] = ($this->fun)($created[$this->getName()], $value);
+	}
+	
+	public function toJSON(bool $justArray=false): string|array {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		$jsonArray['op'] = $this->op;
+		$jsonArray['left'] = $this->left->toJSON(true);
+		$jsonArray['right'] = $this->right->toJSON(true);
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		return json_encode($jsonArray);
 	}
 
 }
@@ -825,7 +1026,7 @@ class SubExpression {
 		while (!ConditionSet::UsedAll($usedOps)) {
 			while (true) {
 				// Stack ops until one of lower or equal precedence is found, then evaluate the higher one first.
-				if (count($this->opStack) || $this->operators[$opIndex] == "("
+				if (count($opStack) || $this->operators[$opIndex] == "("
 						|| (ConditionSet::Precedence($this->operators[$opIndex]) > ConditionSet::Precedence($this->operators[$opStack[array_key_last($opStack)]]))) {
 					$opStack []= $opIndex;
 					// Mark this operator as used and advance.
@@ -873,7 +1074,7 @@ class SubExpression {
 	}
 	
 	// Use a valid working index and data pointer vector to create an evaluable Operation.
-	public function addOperation(array $data, int $index, int $opIndex) {
+	public function addOperation(array &$data, int $index, int $opIndex) {
 		// Obtain the operand indices. The operator is never a parentheses. The
 		// operator index never exceeds the size of the tokens vector.
 		$leftIndex = ConditionSet::FindOperandIndex($this->tokens, $data, $opIndex, true);
@@ -891,8 +1092,8 @@ class SubExpression {
 		}
 	
 		// Record use of an operand by writing where its latest value is found.
-		$this->data[$leftIndex] = $index;
-		$this->data[$rightIndex] = $index;
+		$data[$leftIndex] = $index;
+		$data[$rightIndex] = $index;
 		// Create the Operation.
 		$op = new Operation($this->operators[$opIndex], $leftIndex, $rightIndex);
 		$this->sequence []= $op;
@@ -917,9 +1118,27 @@ class SubExpression {
 	public function fromDatabase(PostLoadEventArgs $eventArgs) {
 		$this->operators = json_decode($this->operatorStr, true);
 		$this->tokens = json_decode($this->tokenStr, true);
-		foreach ($this->sequenceStr as $opArray) {
+		foreach (json_decode($this->sequenceStr, true) as $opArray) {
 			$this->sequence []= new Operation($opArray['op'], $opArray['a'], $opArray['b']);
 		}
+	}
+	
+	public function toJSON(bool $justArray=false): string|array {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		
+		$jsonArray['sequence'] = [];
+		foreach ($this->sequence as $Operation) {
+			$jsonArray['sequence'] []= ['op'=>$Operation->opStr, 'a'=>$Operation->a, 'b'=>$Operation->b];
+		}
+		
+		$jsonArray['tokens'] = $this->tokens;
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		return json_encode($jsonArray);
 	}
 
 }

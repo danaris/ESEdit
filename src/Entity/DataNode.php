@@ -272,7 +272,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		return count($this->children) > 0;
 	}
 	
-	public function getChildren(): array {
+	public function getChildren(): array|ArrayCollection {
 		return $this->children;
 	}
 	

@@ -2,6 +2,10 @@
 
 namespace App\Entity\Sky;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Event\PostLoadEventArgs;
 use Doctrine\ORM\Mapping as ORM;
 
 use App\Entity\DataNode;
@@ -23,6 +27,7 @@ enum NPCTrigger {
 
 #[ORM\Entity]
 #[ORM\Table(name: 'NPC')]
+#[ORM\HasLifecycleCallbacks]
 class NPC {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -58,20 +63,25 @@ class NPC {
 	// Dialog or conversation to show when all requirements for this NPC are met:
 	#[ORM\Column(type: 'text')]
 	private string $dialogText = '';
-	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Phrase', cascade: ['persist'])]
-	#[ORM\JoinColumn(nullable: false, name: 'phraseId')]
-	private Phrase $dialogPhrase; //ExclusiveItem<Phrase>
-	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Conversation', cascade: ['persist'])]
-	#[ORM\JoinColumn(nullable: false, name: 'conversationId')]
-	private Conversation $conversation; //ExclusiveItem<Conversation>
+	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Phrase', cascade: ['persist'])]
+	#[ORM\JoinColumn(nullable: true, name: 'phraseId')]
+	private ?Phrase $dialogPhrase = null; //ExclusiveItem<Phrase>
+	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Conversation', inversedBy: 'npc', cascade: ['persist'])]
+	#[ORM\JoinColumn(nullable: true, name: 'conversationId')]
+	private ?Conversation $conversation = null; //ExclusiveItem<Conversation>
+	
+	private ?Conversation $namedConversation = null;
+	
+	#[ORM\Column(type: 'string', nullable: true)]
+	private ?string $conversationName = null;
 	
 	// Conditions that must be met in order for this NPC to be placed or despawned:
 	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\ConditionSet', cascade: ['persist'])]
-	#[ORM\JoinColumn(nullable: false, name: 'toSpawnId')]
-	private ConditionSet $toSpawn;
+	#[ORM\JoinColumn(nullable: true, name: 'toSpawnId')]
+	private ?ConditionSet $toSpawn = null;
 	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\ConditionSet', cascade: ['persist'])]
-	#[ORM\JoinColumn(nullable: false, name: 'toDespawnId')]
-	private ConditionSet $toDespawn;
+	#[ORM\JoinColumn(nullable: true, name: 'toDespawnId')]
+	private ?ConditionSet $toDespawn = null;
 	// Once true, the NPC will be spawned on takeoff and its success state will influence
 	// the parent mission's ability to be completed.
 	#[ORM\Column(type: 'boolean')]
@@ -108,8 +118,12 @@ class NPC {
 	private TemplatedArray $npcActions; // map<Trigger, NPCAction>
 	
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Mission', inversedBy: 'npcs', cascade: ['persist'])]
-	#[ORM\JoinColumn(nullable: false, name: 'missionId')]
-	private $mission;
+	#[ORM\JoinColumn(nullable: true, name: 'missionId')]
+	private Mission $mission;
+	
+	private static int $lastId = 0;
+	
+	private int $tmpId = -1;
 	
 	public static array $triggerNames = [
 		"kill" => NPCTrigger::KILL,
@@ -121,6 +135,9 @@ class NPC {
 		"capture" => NPCTrigger::CAPTURE,
 		"provoke" => NPCTrigger::PROVOKE
 	];
+
+    #[ORM\OneToMany(mappedBy: 'npc', targetEntity: NPCAction::class, orphanRemoval: true)]
+    private Collection $npcActionCollection;
 	// 
 	// 
 	// namespace {
@@ -151,7 +168,9 @@ class NPC {
 	// }
 	
 	// Construct and Load() at the same time.
-	public function __construct(?DataNode $node = null, ?string $missionName = '') {
+	public function __construct(?DataNode $node = null, ?Mission $mission = null) {
+		$this->tmpId = self::$lastId++;
+		
 		$this->personality = new Personality();
 		$this->cargo = new FleetCargo();
 		$this->uuid = new EsUuid();
@@ -159,18 +178,19 @@ class NPC {
 		$this->toSpawn = new ConditionSet();
 		$this->toDespawn = new ConditionSet();
 		$this->npcActions = TemplatedArrayService::Instance()->createTemplatedArray(NPCAction::class, 'trigger');
-		if ($node && $missionName) {
-			$this->load($node, $missionName);
+		if ($node && $mission) {
+			$this->load($node, $mission);
 		}
+                       $this->npcActionCollection = new ArrayCollection();
 	}
 	
-	
-	
-	public function load(DataNode $node, string $missionName) {
+	public function load(DataNode $node, Mission $mission) {
+		
+		$this->mission = $mission;
+		
 		// Any tokens after the "npc" tag list the things that must happen for this
 		// mission to succeed.
 		for ($i = 1; $i < $node->size(); ++$i) {
-
 			if ($node->getToken($i) == "save") {
 				$this->failIf |= ShipEvent::DESTROY;
 			} else if ($node->getToken($i) == "kill") {
@@ -221,7 +241,7 @@ class NPC {
 					$this->location->load($child);
 				}
 			} else if ($child->getToken(0) == "uuid" && $child->size() >= 2) {
-				$this->uuid = EsUuid::FromString($child->getToken(1));
+				// $this->uuid = EsUuid::FromString($child->getToken(1));
 			} else if ($child->getToken(0) == "planet" && $child->size() >= 2) {
 				$this->planet = GameData::Planets()[$child->getToken(1)];
 			} else if ($child->getToken(0) == "succeed" && $child->size() >= 2) {
@@ -262,7 +282,8 @@ class NPC {
 			} else if ($child->getToken(0) == "conversation" && $child->hasChildren()) {
 				$this->conversation = new Conversation($child);
 			} else if ($child->getToken(0) == "conversation" && $child->size() > 1) {
-				$this->conversation = GameData::Conversations()[$child->getToken(1)];
+				$this->namedConversation = GameData::Conversations()[$child->getToken(1)];
+				$this->conversationName = $child->getToken(1);
 			} else if ($child->getToken(0) == "to" && $child->size() >= 2) {
 				if ($child->getToken(1) == "spawn") {
 					$this->toSpawn->load($child);
@@ -275,7 +296,7 @@ class NPC {
 				if (!isset(self::$triggerNames[$child->getToken(1)])) {
 					$child->printTrace("Skipping unrecognized attribute:");
 				} else {
-					$this->npcActions[self::$triggerNames[$child->getToken(1)]->name]->load($child, $missionName);	
+					$this->npcActions[self::$triggerNames[$child->getToken(1)]->name]->load($child, $mission->getTrueName());	
 				}
 			} else if ($child->getToken(0) == "ship") {
 				if ($child->hasChildren() && $child->size() == 2) {
@@ -285,7 +306,7 @@ class NPC {
 					$this->ships []= $ship;
 					foreach ($child as $grand) {
 						if ($grand->getToken(0) == "actions" && $grand->size() >= 2) {
-							$this->shipEvents[$ship->get()] = $grand->getValue(1);
+							$this->shipEvents[$ship->getName()] = $grand->getValue(1);
 						}
 					}
 				} else if ($child->size() >= 2) {
@@ -335,14 +356,50 @@ class NPC {
 	
 		// Since a ship's government is not serialized, set it now.
 		foreach ($this->ships as $ship) {
-			$this->ship->setGovernment($this->government);
-			$this->ship->setPersonality($this->personality);
-			$this->ship->setIsSpecial();
-			$this->ship->finishLoading(false);
+			$ship->setGovernment($this->government);
+			$ship->setPersonality($this->personality);
+			$ship->setIsSpecial();
+			$ship->finishLoading(false);
 		}
 	}
 	
+	public function getMission(): ?Mission {
+		return $this->mission;
+	}
 	
+	public function setMission(Mission $mission): void {
+		$this->mission = $mission;
+	}
+	
+	#[ORM\PreFlush]
+	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		$handledActions = [];
+		foreach ($this->npcActionCollection as $NPCAction) {
+			$handled = false;
+			$trigger = $NPCAction->getTrigger();
+			if (isset($this->npcActions[$trigger]) && $this->npcActions[$trigger] == $NPCAction) {
+				$handledActions []= $trigger;
+				$handled = true;
+			}
+			if (!$handled) {
+				$eventArgs->getObjectManager()->remove($NPCAction);
+			}
+		}
+		foreach ($this->npcActions as $trigger => $NPCAction) {
+			if (in_array($trigger, $handledActions)) {
+				continue;
+			}
+			$this->npcActionCollection []= $NPCAction;
+		}
+	}
+	
+	#[ORM\PostLoad]
+	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		$this->npcActions = TemplatedArrayService::Instance()->createTemplatedArray(NPCAction::class, 'trigger');
+		foreach ($this->npcActionCollection as $NPCAction) {
+			$this->npcActions[$NPCAction->getTrigger()] = $NPCAction;
+		}
+	}
 	
 // 	// Note: the Save() function can assume this is an instantiated NPC, not
 // 	// a template, so fleets will be replaced by individual ships already.
@@ -849,5 +906,80 @@ class NPC {
 // 			}
 // 		}
 // 	}
+
+	public function toJSON($justArray=false): array|string {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		
+		$jsonArray['id'] = $this->id; // int
+		$jsonArray['government'] = $this->government->getTrueName(); // ?Government
+		//$jsonArray['personality'] = $this->personality->toJSON(true); // Personality
+		//$jsonArray['cargo'] = $this->cargo->toJSON(true); // FleetCargo
+		$jsonArray['overrideFleetCargo'] = $this->overrideFleetCargo; // bool
+		//$jsonArray['uuid'] = $this->uuid; // EsUuid
+		$jsonArray['location'] = $this->location->toJSON(true); // LocationFilter
+		$jsonArray['system'] = $this->system?->getName(); // ?System
+		$jsonArray['isAtDestination'] = $this->isAtDestination; // bool
+		$jsonArray['planet'] = $this->planet?->getName(); // ?Planet
+		$jsonArray['dialogText'] = $this->dialogText; // string
+		//$jsonArray['dialogPhrase'] = $this->dialogPhrase?->toJSON(true); // ?Phrase 
+		$jsonArray['conversation'] = $this->conversation?->toJSON(true); // ?Conversation 
+		$jsonArray['conversationName'] = $this->conversationName; // ?string
+		$jsonArray['toSpawn'] = $this->toSpawn?->toJSON(true); // ?ConditionSet
+		$jsonArray['toDespawn'] = $this->toDespawn?->toJSON(true); // ?ConditionSet
+		$jsonArray['passedSpawnConditions'] = $this->passedSpawnConditions; // bool
+		$jsonArray['passedDespawnConditions'] = $this->passedDespawnConditions; // bool
+		$jsonArray['checkedSpawnConditions'] = $this->checkedSpawnConditions; // bool
+		// $jsonArray['ships'] = $this->ships; // array 
+		// $jsonArray['stockShips'] = $this->stockShips; // array 
+		// $jsonArray['shipNames'] = $this->shipNames; // array 
+		// $jsonArray['fleets'] = $this->fleets; // array 
+		$jsonArray['succeedIf'] = $this->succeedIf; // int
+		$jsonArray['failIf'] = $this->failIf; // int
+		$jsonArray['mustEvade'] = $this->mustEvade; // bool
+		$jsonArray['mustAccompany'] = $this->mustAccompany; // bool
+		// $jsonArray['shipEvents'] = $this->shipEvents; // array 
+		$jsonArray['npcActions'] = [];
+		foreach ($this->npcActions as $trigger => $NPCAction) {
+			$jsonArray['npcActions'][$trigger] = $NPCAction->toJSON(true);
+		}
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		
+		return json_encode($jsonArray);
+	}
+
+    /**
+     * @return Collection<int, NPCAction>
+     */
+    public function getNpcActionCollection(): Collection
+    {
+        return $this->npcActionCollection;
+    }
+
+    public function addNpcActionCollection(NPCAction $npcActionCollection): static
+    {
+        if (!$this->npcActionCollection->contains($npcActionCollection)) {
+            $this->npcActionCollection->add($npcActionCollection);
+            $npcActionCollection->setNpc($this);
+        }
+
+        return $this;
+    }
+
+    public function removeNpcActionCollection(NPCAction $npcActionCollection): static
+    {
+        if ($this->npcActionCollection->removeElement($npcActionCollection)) {
+            // set the owning side to null (unless already changed)
+            if ($npcActionCollection->getNpc() === $this) {
+                $npcActionCollection->setNpc(null);
+            }
+        }
+
+        return $this;
+    }
 
 }

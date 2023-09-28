@@ -135,7 +135,7 @@ class Personality {
 		
 		if (!isset(self::$traitNames[$token])) {
 			if (!isset(self::$compositeTraits[$token])) {
-				$node->printTrace("Warning: Skipping unrecognized personality \"" . token . "\":");
+				$node->printTrace("Warning: Skipping unrecognized personality \"" . $token . "\":");
 			} else {
 				$traits = self::$compositeTraits[$token];
 				foreach ($traits as $trait) {

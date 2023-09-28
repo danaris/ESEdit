@@ -100,12 +100,12 @@ class Ship extends Body {
 	// Number of AI steps this ship has spent lingering
 	protected int $lingerSteps = 0;
 	
-	protected Command $commands;
-	protected FireCommand $firingCommands;
+	// protected Command $commands;
+	// protected FireCommand $firingCommands;
 	
 	protected Personality $personality;
 	protected ?Phrase $hail = null;
-	protected ShipAICache $aiCache;
+	// protected ShipAICache $aiCache;
 	
 	// Installed outfits, cargo, etc.:
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Outfit', cascade: ['persist'])]
@@ -182,6 +182,8 @@ class Ship extends Body {
 	protected int $pilotError = 0;
 	#[ORM\Column(type: 'integer')]
 	protected int $pilotOkay = 0;
+
+	protected ?Government $government = null;
 	
 	// Current status of this particular ship:
 	protected ?System $currentSystem = null;
@@ -189,7 +191,7 @@ class Ship extends Body {
 	// hyperspacing, and exploding. Each one must track some special counters:
 	protected ?Planet $landingPlanet = null;
 	
-	protected ShipJumpNavigation $navigation;
+	// protected ShipJumpNavigation $navigation;
 	protected int $hyperspaceCount = 0;
 	protected ?System $hyperspaceSystem = null;
 	protected bool $isUsingJumpDrive = false;
@@ -240,6 +242,9 @@ class Ship extends Body {
 
     #[ORM\OneToMany(mappedBy: 'ship', targetEntity: Hardpoint::class, orphanRemoval: true, cascade: ['persist'])]
     protected Collection $hardpoints;
+
+    #[ORM\ManyToMany(targetEntity: Sale::class, mappedBy: 'ships')]
+    private Collection $shipyards;
 
 	// Helper function to transfer energy to a given stat if it is less than the
 	// given maximum value.
@@ -380,12 +385,18 @@ class Ship extends Body {
 		}
 		$this->BAY_ANGLE = [new Angle(0.), new Angle(-90.), new Angle(90.), new Angle(180.)];
 		$this->shipOutfits = new ArrayCollection();
-                 $this->hardpoints = new ArrayCollection();
+		$this->hardpoints = new ArrayCollection();
+		$this->shipyards = new ArrayCollection();
 	}
 	
 	public function load(DataNode $node): void {
 		if ($node->size() >= 2) {
 			$this->trueModelName = $node->getToken(1);
+		}
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
 		}
 		if ($node->size() >= 3) {
 			$this->base = GameData::Ships()[$this->trueModelName];
@@ -393,7 +404,7 @@ class Ship extends Body {
 		}
 		$this->isDefined = true;
 	
-		$this->government = GameData::PlayerGovernment();
+		//$this->government = GameData::PlayerGovernment();
 			
 		$indexName = $this->trueModelName;
 		if ($this->variantName) {
@@ -419,6 +430,9 @@ class Ship extends Body {
 				continue;
 			}
 			if ($key == "sprite") {
+				if ($this->trueModelName == "Wasp") {
+					error_log('Loading the sprite for the Wasp');
+				}
 				$this->loadSprite($child);
 			} else if ($child->getToken(0) == "thumbnail" && $child->size() >= 2) {
 				$this->thumbnail = SpriteSet::Get($child->getToken(1));
@@ -433,7 +447,7 @@ class Ship extends Body {
 			} else if ($key == "swizzle" && $child->size() >= 2) {
 				$this->customSwizzle = $child->getValue(1);
 			} else if ($key == "uuid" && $child->size() >= 2) {
-				$this->uuid = EsUuid::FromString($child->getToken(1));
+				// $this->uuid = EsUuid::FromString($child->getToken(1));
 			} else if ($key == "attributes" || $add) {
 				if (!$add) {
 					$this->baseAttributes->setTrueName($indexName.' Base Attributes');
@@ -930,28 +944,28 @@ class Ship extends Body {
 		// Check that all the "equipped" weapons actually match what your ship
 		// has, and that they are truly weapons. Remove any excess weapons and
 		// warn if any non-weapon outfits are "installed" in a hardpoint.
-// 		auto equipped = GetEquipped(Weapons());
-// 		for (auto &it : equipped) {
-// 
-// 			auto outfitIt = outfits.find(it.first);
-// 			int amount = (outfitIt != outfits.end() ? outfitIt->second : 0);
-// 			int excess = it.second - amount;
-// 			if (excess > 0) {
-// 
-// 				// If there are more hardpoints specifying this outfit than there
-// 				// are instances of this outfit installed, remove some of them.
-// 				armament.Add(it.first, -excess);
-// 				it.second -= excess;
-// 	
-// 				LogWarning(VariantName(), Name(),
-// 						"outfit \"" + it.first->TrueName() + "\" equipped but not included in outfit list.");
-// 			} else if (!it.first->IsWeapon()) {
-// 				// This ship was specified with a non-weapon outfit in a
-// 				// hardpoint. Hardpoint::Install removes it, but issue a
-// 				// warning so the definition can be fixed.
-// 				LogWarning(VariantName(), Name(),
-// 						"outfit \"" + it.first->TrueName() + "\" is not a weapon, but is installed as one.");
-// 		}
+               // 		auto equipped = GetEquipped(Weapons());
+               // 		for (auto &it : equipped) {
+               // 
+               // 			auto outfitIt = outfits.find(it.first);
+               // 			int amount = (outfitIt != outfits.end() ? outfitIt->second : 0);
+               // 			int excess = it.second - amount;
+               // 			if (excess > 0) {
+               // 
+               // 				// If there are more hardpoints specifying this outfit than there
+               // 				// are instances of this outfit installed, remove some of them.
+               // 				armament.Add(it.first, -excess);
+               // 				it.second -= excess;
+               // 	
+               // 				LogWarning(VariantName(), Name(),
+               // 						"outfit \"" + it.first->TrueName() + "\" equipped but not included in outfit list.");
+               // 			} else if (!it.first->IsWeapon()) {
+               // 				// This ship was specified with a non-weapon outfit in a
+               // 				// hardpoint. Hardpoint::Install removes it, but issue a
+               // 				// warning so the definition can be fixed.
+               // 				LogWarning(VariantName(), Name(),
+               // 						"outfit \"" + it.first->TrueName() + "\" is not a weapon, but is installed as one.");
+               // 		}
 	
 		// Mark any drone that has no "automaton" value as an automaton, to
 		// grandfather in the drones from before that attribute existed.
@@ -1002,7 +1016,7 @@ class Ship extends Body {
 			}
 		}
 		if (count($undefinedOutfits) > 0) {
-
+               
 			$plural = count($undefinedOutfits) > 1;
 			// Print the ship name once, then all undefined outfits. If we're reporting for a stock ship, then it
 			// doesn't have a name, and missing outfits aren't named yet either. A variant name might exist, though.
@@ -1011,7 +1025,7 @@ class Ship extends Body {
 				$message = "Player ship " . $this->trueModelName . " \"" . $this->name . "\":";
 				$PREFIX = $plural ? "\n\tUndefined outfit " : " undefined outfit ";
 				foreach ($undefinedOutfits as $outfitName) {
-					$message .= $PREFIX . $outfit;
+					$message .= $PREFIX . $outfitName;
 				}
 			} else {
 				$message = $this->variantName == '' ? "Stock ship \"" . $this->trueModelName . "\": " : $this->trueModelName . " variant \"" . $this->variantName . "\": ";
@@ -1024,22 +1038,22 @@ class Ship extends Body {
 		// turrets are in turret mounts. This can only happen when the armament
 		// is configured incorrectly in a ship or variant definition. Do not
 		// bother printing this warning if the outfit is not fully defined.
-// 		for (const Hardpoint &hardpoint : armament.Get()) {
-// 
-// 			const Outfit *outfit = hardpoint.GetOutfit();
-// 			if (outfit && outfit->IsDefined() {
-// 					&& (hardpoint.IsTurret() != (outfit->Get("turret mounts") != 0.)))
-// 			{
-// 				string warning = (!isYours && !variantName.empty()) ? "variant \"" + variantName + "\"" : trueModelName;
-// 				if (!name.empty()) {
-// 					warning += " \"" + name + "\"";
-// 				warning += ": outfit \"" + outfit->TrueName() + "\" installed as a ";
-// 				warning += (hardpoint.IsTurret() ? "turret but is a gun.\n\tturret" : "gun but is a turret.\n\tgun");
-// 				warning += to_string(2. * hardpoint.GetPoint().X()) + " " + to_string(2. * hardpoint.GetPoint().Y());
-// 				warning += " \"" + outfit->TrueName() + "\"";
-// 				Logger::LogError(warning);
-// 			}
-// 		}
+               // 		for (const Hardpoint &hardpoint : armament.Get()) {
+               // 
+               // 			const Outfit *outfit = hardpoint.GetOutfit();
+               // 			if (outfit && outfit->IsDefined() {
+               // 					&& (hardpoint.IsTurret() != (outfit->Get("turret mounts") != 0.)))
+               // 			{
+               // 				string warning = (!isYours && !variantName.empty()) ? "variant \"" + variantName + "\"" : trueModelName;
+               // 				if (!name.empty()) {
+               // 					warning += " \"" + name + "\"";
+               // 				warning += ": outfit \"" + outfit->TrueName() + "\" installed as a ";
+               // 				warning += (hardpoint.IsTurret() ? "turret but is a gun.\n\tturret" : "gun but is a turret.\n\tgun");
+               // 				warning += to_string(2. * hardpoint.GetPoint().X()) + " " + to_string(2. * hardpoint.GetPoint().Y());
+               // 				warning += " \"" + outfit->TrueName() + "\"";
+               // 				Logger::LogError(warning);
+               // 			}
+               // 		}
 		$this->cargo->setSize($this->attributes->get("cargo space"));
 	
 		// Figure out how far from center the farthest hardpoint is.
@@ -1051,53 +1065,53 @@ class Ship extends Body {
 		// Ensure that all defined bays are of a valid category. Remove and warn about any
 		// invalid bays. Add a default "launch effect" to any remaining internal bays if
 		// this ship is crewed (i.e. pressurized).
-// 		string warning;
-// 		const auto &bayCategories = GameData::GetCategory(CategoryType::BAY);
-// 		for (auto it = bays.begin(); it != bays.end(); ) {
-// 
-// 			Bay &bay = *it;
-// 			if (!bayCategories.Contains(bay.category)) {
-// 
-// 				warning += "Invalid bay category: " + bay.category + "\n";
-// 				it = bays.erase(it);
-// 				continue;
-// 			} else
-// 				++it;
-// 			if (bay.side == Bay::INSIDE && bay.launchEffects.empty() && Crew()) {
-// 				bay.launchEffects.emplace_back(GameData::Effects().Get("basic launch"));
-// 		}
+               // 		string warning;
+               // 		const auto &bayCategories = GameData::GetCategory(CategoryType::BAY);
+               // 		for (auto it = bays.begin(); it != bays.end(); ) {
+               // 
+               // 			Bay &bay = *it;
+               // 			if (!bayCategories.Contains(bay.category)) {
+               // 
+               // 				warning += "Invalid bay category: " + bay.category + "\n";
+               // 				it = bays.erase(it);
+               // 				continue;
+               // 			} else
+               // 				++it;
+               // 			if (bay.side == Bay::INSIDE && bay.launchEffects.empty() && Crew()) {
+               // 				bay.launchEffects.emplace_back(GameData::Effects().Get("basic launch"));
+               // 		}
 	
 		$this->canBeCarried = in_array($this->attributes->getCategory(), ['Fighter','Drone']);
 	
 		// Issue warnings if this ship has is misconfigured, e.g. is missing required values
 		// or has negative outfit, cargo, weapon, or engine capacity.
-// 		for (auto &&attr : set<string>{"outfit space", "cargo space", "weapon capacity", "engine capacity"}) {
-// 
-// 			float val = attributes.Get(attr);
-// 			if (val < 0) {
-// 				warning += attr + ": " + Format::Number(val) + "\n";
-// 		}
-// 		if (attributes.Get("drag") <= 0.) {
-// 
-// 			warning += "Defaulting " + string(attributes.Get("drag") ? "invalid" : "missing") + " \"drag\" attribute to 100.0\n";
-// 			attributes.Set("drag", 100.);
-// 		}
+               // 		for (auto &&attr : set<string>{"outfit space", "cargo space", "weapon capacity", "engine capacity"}) {
+               // 
+               // 			float val = attributes.Get(attr);
+               // 			if (val < 0) {
+               // 				warning += attr + ": " + Format::Number(val) + "\n";
+               // 		}
+               // 		if (attributes.Get("drag") <= 0.) {
+               // 
+               // 			warning += "Defaulting " + string(attributes.Get("drag") ? "invalid" : "missing") + " \"drag\" attribute to 100.0\n";
+               // 			attributes.Set("drag", 100.);
+               // 		}
 	
 		// Calculate the values used to determine this ship's value and danger.
 		// attraction = CalculateAttraction();
 		// deterrence = CalculateDeterrence();
 	
-// 		if (!warning.empty()) {
-// 
-// 			// This check is mostly useful for variants and stock ships, which have
-// 			// no names. Print the outfits to facilitate identifying this ship definition.
-// 			string message = (!name.empty() ? "Ship \"" + name + "\" " : "") + "(" + VariantName() + "):\n";
-// 			ostringstream outfitNames;
-// 			outfitNames << "has outfits:\n";
-// 			for (const auto &it : outfits) {
-// 				outfitNames << '\t' << it.second << " " + it.first->TrueName() << endl;
-// 			Logger::LogError(message + warning + outfitNames.str());
-// 		}
+               // 		if (!warning.empty()) {
+               // 
+               // 			// This check is mostly useful for variants and stock ships, which have
+               // 			// no names. Print the outfits to facilitate identifying this ship definition.
+               // 			string message = (!name.empty() ? "Ship \"" + name + "\" " : "") + "(" + VariantName() + "):\n";
+               // 			ostringstream outfitNames;
+               // 			outfitNames << "has outfits:\n";
+               // 			for (const auto &it : outfits) {
+               // 				outfitNames << '\t' << it.second << " " + it.first->TrueName() << endl;
+               // 			Logger::LogError(message + warning + outfitNames.str());
+               // 		}
 	
 	}
 // 	
@@ -1152,77 +1166,91 @@ class Ship extends Body {
 				$out->write(["category", $this->baseAttributes->getCategory()]);
 				$out->write(["cost", $this->baseAttributes->getCost()]);
 				$out->write(["mass", $this->baseAttributes->getMass()]);
-				foreach ($this->baseAttributes->getFlareSprites() as $flareSpriteName => $count) {
-					$flareSprite = SpriteSet::Get($flareSpriteName);
+				foreach ($this->baseAttributes->getFlareSprites() as $flareSpriteData) {
+					$flareSprite = $flareSpriteData['body'];
+					$count = $flareSpriteData['count'];
 					for ($i=0; $i<$count; $i++) {
 						$flareSprite->saveSprite($out, 'flare sprite');
 					}
 				}
-				foreach ($this->baseAttributes->getFlareSounds() as $flareSoundsName => $count) {
+				foreach ($this->baseAttributes->getFlareSounds() as $flareSoundsData) {
+					$count = $flareSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['flare sound', $flareSounds]);
+						$out->write(['flare sound', $flareSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getReverseFlareSprites() as $reverseFlareSpritesName => $count) {
-					$reverseFlareSprites = SpriteSet::Get($reverseFlareSpritesName);
+				foreach ($this->baseAttributes->getReverseFlareSprites() as $reverseFlareSpriteData) {
+					$reverseFlareSprites = $reverseFlareSpriteData['body'];
+					$count = $reverseFlareSpriteData['count'];
 					for ($i=0; $i<$count; $i++) {
 						$reverseFlareSprites->saveSprite($out, 'reverse flare sprite');
 					}
 				}
-				foreach ($this->baseAttributes->getReverseFlareSounds() as $reverseFlareSoundsName => $count) {
+				foreach ($this->baseAttributes->getReverseFlareSounds() as $reverseFlareSoundsData) {
+					$count = $reverseFlareSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['reverse flare sound', $reverseFlareSounds]);
+						$out->write(['reverse flare sound', $reverseFlareSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getSteeringFlareSprites() as $steeringFlareSpritesName => $count) {
-					$steeringFlareSprites = SpriteSet::Get($steeringFlareSpritesName);
+				foreach ($this->baseAttributes->getSteeringFlareSprites() as $steeringFlareSpriteData) {
+					$steeringFlareSprites = $steeringFlareSpriteData['body'];
+					$count = $steeringFlareSpriteData['count'];
 					for ($i=0; $i<$count; $i++) {
 						$steeringFlareSprites->saveSprite($out, 'steering flare sprite');
 					}
 				}
-				foreach ($this->baseAttributes->getSteeringFlareSounds() as $steeringFlareSoundsName => $count) {
+				foreach ($this->baseAttributes->getSteeringFlareSounds() as $steeringFlareSoundsData) {
+					$count = $steeringFlareSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['steering flare sound', $steeringFlareSounds]);
+						$out->write(['steering flare sound', $steeringFlareSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getAfterburnerEffects() as $afterburnerEffectsName => $count) {
+				foreach ($this->baseAttributes->getAfterburnerEffects() as $afterburnerEffectsData) {
+					$count = $afterburnerEffectsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['afterburner effect', $afterburnerEffects]);
+						$out->write(['afterburner effect', $afterburnerEffectsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getJumpEffects() as $jumpEffectsName => $count) {
+				foreach ($this->baseAttributes->getJumpEffects() as $jumpEffectsData) {
+					$count = $jumpEffectsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['jump effect', $jumpEffects]);
+						$out->write(['jump effect', $jumpEffectsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getJumpSounds() as $jumpSoundsName => $count) {
+				foreach ($this->baseAttributes->getJumpSounds() as $jumpSoundsData) {
+					$count = $jumpSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['jump sound', $jumpSounds]);
+						$out->write(['jump sound', $jumpSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getJumpInSounds() as $jumpInSoundsName => $count) {
+				foreach ($this->baseAttributes->getJumpInSounds() as $jumpInSoundsData) {
+					$count = $jumpInSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['jump in sound', $jumpInSounds]);
+						$out->write(['jump in sound', $jumpInSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getJumpOutSounds() as $jumpOutSoundsName => $count) {
+				foreach ($this->baseAttributes->getJumpOutSounds() as $jumpOutSoundsData) {
+					$count = $jumpOutSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['jump out sound', $jumpOutSounds]);
+						$out->write(['jump out sound', $jumpOutSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getHyperSounds() as $hyperSoundsName => $count) {
+				foreach ($this->baseAttributes->getHyperSounds() as $hyperSoundsData) {
+					$count = $hyperSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['hyperdrive sound', $hyperSounds]);
+						$out->write(['hyperdrive sound', $hyperSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getHyperInSounds() as $hyperInSoundsName => $count) {
+				foreach ($this->baseAttributes->getHyperInSounds() as $hyperInSoundsData) {
+					$count = $hyperInSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['hyperdrive in sound', $hyperInSounds]);
+						$out->write(['hyperdrive in sound', $hyperInSoundsData['val']->getName()]);
 					}
 				}
-				foreach ($this->baseAttributes->getHyperOutSounds() as $hyperOutSoundsName => $count) {
+				foreach ($this->baseAttributes->getHyperOutSounds() as $hyperOutSoundsData) {
+					$count = $hyperOutSoundsData['count'];
 					for ($i=0; $i<$count; $i++) {
-						$out->write(['hyperdrive out sound', $hyperOutSounds]);
+						$out->write(['hyperdrive out sound', $hyperOutSoundsData['val']->getName()]);
 					}
 				}
 				foreach ($this->baseAttributes->getAttributes() as $attrName => $count) {
@@ -1273,7 +1301,7 @@ class Ship extends Body {
 				$out->beginChild();
 				$out->write(["zoom", $point->zoom]);
 				$out->write(["angle", $point->facing->getDegrees()]);
-				$out->write(ENGINE_SIDE[$point->side]);
+				$out->write(self::ENGINE_SIDE[$point->side]);
 				$out->endChild();
 	
 			}
@@ -1282,7 +1310,7 @@ class Ship extends Body {
 				$out->beginChild();
 				$out->write(["zoom", $point->zoom]);
 				$out->write(["angle", $point->facing->getDegrees() - 180.]);
-				$out->write(ENGINE_SIDE[$point->side]);
+				$out->write(self::ENGINE_SIDE[$point->side]);
 				$out->endChild();
 			}
 			foreach ($this->steeringEnginePoints as $point) {
@@ -1290,8 +1318,8 @@ class Ship extends Body {
 				$out->beginChild();
 				$out->write(["zoom", $point->zoom]);
 				$out->write(["angle", $point->facing->getDegrees()]);
-				$out->write(ENGINE_SIDE[$point->side]);
-				$out->write(STEERING_FACING[$point->steering]);
+				$out->write(self::ENGINE_SIDE[$point->side]);
+				$out->write(self::STEERING_FACING[$point->steering]);
 				$out->endChild();
 			}
 			foreach ($this->hardpoints as $Hardpoint) {
@@ -1331,7 +1359,7 @@ class Ship extends Body {
 							$out->write(["angle", $Bay->facing->getDegrees()]);
 						}
 						if ($Bay->side) {
-							$out->write(BAY_SIDE[$Bay->side]);
+							$out->write(self::BAY_SIDE[$Bay->side]);
 						}
 						foreach ($Bay->launchEffects as $effect) {
 							$out->write(["launch effect", $effect->getName()]);
@@ -1367,7 +1395,7 @@ class Ship extends Body {
 				// }
 			}
 			if ($this->landingPlanet) {
-				$out->write(["planet", $landingPlanet->getTrueName()]);
+				$out->write(["planet", $this->landingPlanet->getTrueName()]);
 			}
 			if ($this->targetSystem) {
 				$out->write(["destination system", $this->targetSystem->getName()]);
@@ -1651,6 +1679,11 @@ class Ship extends Body {
 // 			SetSwizzle(customSwizzle >= 0 ? customSwizzle : government->GetSwizzle());
 // 		this->government = government;
 // 	}
+
+	public function getGovernment(): ?Government {
+		return $this->government;
+	}
+
 // 	
 // 	
 // 	
@@ -2250,10 +2283,9 @@ class Ship extends Body {
 // 	
 // 	
 // 	
-// 	const System *Ship::GetSystem() const
-// 	{
-// 		return currentSystem;
-// 	}
+	public function getSystem(): System {
+		return $this->currentSystem;
+	}
 // 	
 // 	
 // 	
@@ -3258,17 +3290,9 @@ class Ship extends Body {
 // 	
 // 	
 // 	
-// 	CargoHold &Ship::Cargo()
-// 	{
-// 		return cargo;
-// 	}
-// 	
-// 	
-// 	
-// 	const CargoHold &Ship::Cargo() const
-// 	{
-// 		return cargo;
-// 	}
+	public function getCargo(): CargoHold {
+		return $this->cargo;
+	}
 // 	
 // 	
 // 	
@@ -3328,20 +3352,18 @@ class Ship extends Body {
 // 	
 // 	
 // 	
-// 	const Outfit &Ship::Attributes() const
-// 	{
-// 		return attributes;
-// 	}
-// 	
-// 	
-// 	
-// 	const Outfit &Ship::BaseAttributes() const
-// 	{
-// 		return baseAttributes;
-// 	}
-// 	
-// 	
-// 	
+	public function getAttributes(): Outfit {
+		return $this->attributes;
+	}
+	
+	
+	
+	public function getBaseAttributes(): Outfit {
+		return $this->baseAttributes;
+	}
+	
+	
+	
 // 	// Get outfit information.
 // 	const map<const Outfit *, int> &Ship::Outfits() const
 // 	{
@@ -4871,6 +4893,11 @@ class Ship extends Body {
 		$jsonArray['shields'] = $this->shields;
 		$jsonArray['hull'] = $this->hull;
 		
+		$jsonArray['shipyards'] = [];
+		foreach ($this->shipyards as $Shipyard) {
+			$jsonArray['shipyards'] []= $Shipyard->getName();
+		}
+		
 		if (count($this->getOutfits()) == 0 && $this->base && count($this->base->getOutfits()) > 0) {
 			$jsonArray['outfits'] = $this->base->getOutfits();
 		} else {
@@ -4926,10 +4953,10 @@ class Ship extends Body {
 		$this->addAttributes = $jsonArray['addAttributes'];
 		$this->shields = $jsonArray['shields'] ?: $this->baseAttributes->get('shields');
 		$this->hull = $jsonArray['hull'] ?: $this->baseAttributes->get('hull');
-		$this->mass = $this->baseAttributes->getMass();
-		$this->cost = $this->baseAttributes->getCost();
+		// $this->mass = $this->baseAttributes->getMass();
+		// $this->cost = $this->baseAttributes->getCost();
 		$this->crew = $this->baseAttributes->get('required crew');
-		$this->bunks = $this->baseAttributes->get('bunks');
+		// $this->bunks = $this->baseAttributes->get('bunks');
 		
 		$this->outfits = $jsonArray['outfits'];
 		
@@ -5005,6 +5032,33 @@ class Ship extends Body {
             if ($hardpoint->getShip() === $this) {
                 $hardpoint->setShip(null);
             }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Sale>
+     */
+    public function getShipyards(): Collection
+    {
+        return $this->shipyards;
+    }
+
+    public function addShipyard(Sale $shipyard): static
+    {
+        if (!$this->shipyards->contains($shipyard)) {
+            $this->shipyards->add($shipyard);
+            $shipyard->addShip($this);
+        }
+
+        return $this;
+    }
+
+    public function removeShipyard(Sale $shipyard): static
+    {
+        if ($this->shipyards->removeElement($shipyard)) {
+            $shipyard->removeShip($this);
         }
 
         return $this;

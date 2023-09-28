@@ -5,12 +5,17 @@ namespace App\Entity\Sky;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use ApiPlatform\Metadata\ApiResource;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Event\PostLoadEventArgs;
 
 use App\Entity\DataNode;
 use App\Entity\DataWriter;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'Conversation')]
+#[ORM\HasLifecycleCallbacks]
+#[ApiResource]
 class Conversation {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -18,7 +23,7 @@ class Conversation {
 	private int $id;
 	
 	#[ORM\Column(type: 'string', nullable: true)]
-	public ?string $name;
+	public ?string $name = null;
 	
 	// While parsing the conversation, keep track of what labels link to what
 	// nodes. If a name appears in a goto before that label appears, remember
@@ -26,8 +31,40 @@ class Conversation {
 	protected array $labels = [];
 	protected array $unresolved = [];
 	// The actual conversation data:
-	#[ORM\OneToMany(targetEntity: 'App\Entity\Sky\Node', mappedBy: 'conversation', cascade: ['persist'])]
+	#[ORM\OneToMany(targetEntity: 'App\Entity\Sky\Node', mappedBy: 'conversation', cascade: ['persist'], fetch: 'EAGER')]
 	protected Collection $nodes;
+	
+	#[ORM\Column(type: 'string')]
+	private string $sourceName = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceFile = '';
+	#[ORM\Column(type: 'string')]
+	private string $sourceVersion = '';
+	
+	#[ORM\OneToOne(targetEntity: MissionAction::class, mappedBy: 'conversation')]
+	#[ORM\JoinColumn(nullable: true, name: 'missionActionId')]
+	protected ?MissionAction $missionAction = null;
+	
+	#[ORM\OneToOne(targetEntity: NPC::class, mappedBy: 'conversation')]
+	#[ORM\JoinColumn(nullable: true, name: 'npcId')]
+	protected ?NPC $npc = null;
+	
+	#[ORM\Column(type: 'text')]
+	protected string $labelsStr = '';
+	protected array $labelNames = [];
+	
+	#[ORM\PreFlush]
+	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		$this->labelsStr = json_encode($this->labels);
+	}
+	
+	#[ORM\PostLoad]
+	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		$this->labels = json_decode($this->labelsStr, true);
+		foreach ($this->labels as $label => $labelIndex) {
+			$this->labelNames[$labelIndex] = $label;
+		}
+	}
 	
 	const ACCEPT = -1;
 	const DECLINE = -2;
@@ -94,26 +131,87 @@ class Conversation {
 		}
 	}
 	
+	public function getId(): int {
+		return $this->id;
+	}
+	public function setId(int $id): void {
+		$this->id = $id;
+	}
+	
+	public function getName(): ?string {
+		return $this->name;
+	}
+	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
+	public function getLabelForIndex(int $labelIndex): ?string {
+		if (isset($this->labelNames[$labelIndex])) {
+			return $this->labelNames[$labelIndex];
+		}
+		return null;
+	}
+	
+	public function getLabels(): array {
+		return $this->labels;
+	}
+	
+	public function getLabelNames(): array {
+		return $this->labelNames;
+	}
+	
 	// Load a conversation from file.
 	public function load(DataNode $node, string $missionName = '') {
 		// Make sure this really is a conversation specification.
 		if ($node->getToken(0) != "conversation") {
+			error_log('#CL ['.$node->getToken(0).'] not a conversation node');
 			return;
 		}
 		
 		if ($node->size() >= 2) {
 			$this->name = $node->getToken(1);
+		} /*else {
+			error_log('Nameless conversation');
+		}*/
+		error_log('#CL Processing conversation '.$this->name);
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
 		}
 	
 		// Free any previously loaded data.
 		$this->nodes->clear();
 	
 		foreach ($node as $child) {
+			$child->printTrace('#CL processing node: ');
 			if ($child->getToken(0) == "scene" && $child->size() >= 2) {
 				// A scene always starts a new text node.
 				$this->addNode();
 				$lastNode = $this->nodes[array_key_last($this->nodes->toArray())];
 				$lastNode->scene = SpriteSet::Get($child->getToken(1));
+				error_log('#CL Added scene '.$lastNode->scene);
 			} else if ($child->getToken(0) == "label" && $child->size() >= 2) {
 				// You cannot merge text above a label with text below it.
 				if (count($this->nodes) > 0) {
@@ -121,11 +219,12 @@ class Conversation {
 					$lastNode->canMergeOnto = false;
 				}
 				$this->addLabel($child->getToken(1), $child);
+				error_log('#CL Added label '.$child->getToken(1));
 			} else if ($child->getToken(0) == "choice") {
 				// Create a new node with one or more choices in it.
-				$node = new Node(true);
-				$node->setConversation($this);
-				$this->nodes []= $node;
+				$convNode = new Node(true);
+				$convNode->setConversation($this);
+				$this->nodes []= $convNode;
 				$foundErrors = false;
 				foreach ($child as $grand) {
 					// Check for common errors such as indenting a goto incorrectly:
@@ -137,55 +236,53 @@ class Conversation {
 	
 					// Store the text of this choice. By default, the choice will
 					// just bring you to the next node in the script.
-					$lastNode = $this->nodes[array_key_last($this->nodes->toArray())];
 					$element = new Element();
-					$element->setNode($lastNode);
+					$element->setNode($convNode);
 					$element->text = $grand->getToken(0) . "\n";
 					$element->next = count($this->nodes);
-					$lastNode->elements []= $element;
-	
+					$convNode->elements []= $element;
+					
 					$this->loadDestinations($grand);
 				}
-				$lastNode = $this->nodes[array_key_last($this->nodes->toArray())];
-				if (count($lastNode->elements) == 0) {
+				if (count($convNode->elements) == 0) {
 					if (!$foundErrors) {
 						$child->printTrace("Warning: Conversation contains an empty \"choice\" node:");
 					}
-					array_pop($this->nodes);
+					$this->nodes->removeElement($convNode);
 				}
+				error_log('#CL Added choice node');
 			} else if ($child->getToken(0) == "name") {
 				// A name entry field is just represented as an empty choice node.
-				$node = new Node(true);
-				$node->setConversation($this);
-				$this->nodes []= $node;
+				$convNode = new Node(true);
+				$convNode->setConversation($this);
+				$this->nodes []= $convNode;
 			} else if ($child->getToken(0) == "branch") {
 				// Don't merge "branch" nodes with any other nodes.
-				$node = new Node();
-				$node->setConversation($this);
-				$this->nodes []= $node;
-				$node->canMergeOnto = false;
-				$node->conditions->load($child);
+				$convNode = new Node();
+				$convNode->setConversation($this);
+				$convNode->branchName = $child->getToken(1);
+				$this->nodes []= $convNode;
+				$convNode->canMergeOnto = false;
+				$convNode->conditions->load($child);
 				// A branch should always specify what node to go to if the test is
 				// true, and may also specify where to go if it is false.
 				for ($i = 1; $i <= 2; ++$i) {
 					// If no link is provided, just go to the next node.
-					$lastNode = $this->nodes[array_key_last($this->nodes->toArray())];
 					$element = new Element();
-					$element->setNode($lastNode);
+					$element->setNode($convNode);
 					$element->text = "";
 					$element->next = count($this->nodes);
-					$lastNode->elements []= $element;
+					$convNode->elements []= $element;
 					if ($child->size() > $i) {
 						$index = self::TokenIndex($child->getToken($i));
 						if (!$index) {
 							$this->goto($child->getToken($i), count($this->nodes) - 1, $i - 1);
 						} else if ($index < 0) {
-							$lastNode = $this->nodes[array_key_last($this->nodes->toArray())];
-							$lastElement = $lastNode->elements[array_key_last($lastNode->elements->toArray())];
-							$lastElement->next = $index;
+							$element->next = $index;
 						}
 					}
 				}
+				error_log('#CL Added branch node to '.$convNode->branchName);
 			} else if ($child->getToken(0) == "action" || $child->getToken(0) == "apply") {
 				if ($child->getToken(0) == "apply") {
 					$child->printTrace("Warning: `apply` is deprecated syntax. Use `action` instead to ensure future compatibility.");
@@ -195,6 +292,7 @@ class Conversation {
 				$lastNode = count($this->nodes) > 0 ? $this->nodes[array_key_last($this->nodes->toArray())] : null;
 				$lastNode->canMergeOnto = false;
 				$lastNode->actions->load($child, $missionName);
+				error_log('#CL Added action/apply node');
 			} else if ($child->size() > 1) {
 				// Check for common errors such as indenting a goto incorrectly:
 				$child->printTrace("Error: Conversation text should be a single token:");
@@ -219,6 +317,7 @@ class Conversation {
 				if ($this->loadDestinations($child)) {
 					$lastNode->canMergeOnto = false;
 				}
+				error_log('#CL Added text node');
 			}
 		}
 	
@@ -243,7 +342,6 @@ class Conversation {
 		}
 	
 		// Free the working buffers that we no longer need.
-		$this->labels = [];
 		$this->unresolved = [];
 	}
 	
@@ -288,6 +386,9 @@ class Conversation {
 				// Break the text up into paragraphs.
 				$elLines = explode("\n", $el->text);
 				foreach ($elLines as $line) {
+					if ($line === '') {
+						continue;
+					}
 					$out->write($line, true);
 					// If the conditions are the same, output them for each
 					// paragraph. (We currently don't merge paragraphs with
@@ -341,6 +442,7 @@ class Conversation {
 				$lastNode = $this->nodes[array_key_last($this->nodes->toArray())];
 				$lastElement = $lastNode->elements[array_key_last($lastNode->elements->toArray())];
 				$lastElement->conditions->load($child);
+				$lastElement->conditions->setConversationNodeElement($lastElement);
 				$hasCondition = true;
 			} else {
 				// Check if this is a recognized endpoint name.
@@ -493,7 +595,9 @@ class Conversation {
 		return $this->nodes[$node]->scene;
 	}
 	
-	
+	public function getNodes(): Collection {
+		return $this->nodes;
+	}	
 	
 	// Find out where the conversation goes if the given option is chosen.
 	public function nextNodeForChoice(int $node, int $element = -1): int {
@@ -508,7 +612,7 @@ class Conversation {
 	public function stepToNextNode(int $node): int {
 		$next_node = $node+1;
 	
-		if (!this->nodeIsValid($next_node)) {
+		if (!$this->nodeIsValid($next_node)) {
 			return Conversation::DECLINE;
 		}
 	
@@ -578,6 +682,7 @@ class Conversation {
 	
 		// Remember what index this label points to.
 		$this->labels[$label] = count($this->nodes);
+		$this->labelNames[count($this->nodes)] = $label;
 	}
 	
 	// Set up a "goto". Depending on whether the named label has been seen yet
@@ -597,14 +702,60 @@ class Conversation {
 	public function addNode(): void {
 		$node = new Node();
 		$node->setConversation($this);
+		$this->nodes []= $node;
 		$element = new Element();
 		$element->setNode($node);
 		$element->text = "";
 		$element->next = count($this->nodes);
 		$node->elements []= $element;
-		$this->nodes []= $node;
 	}
-
+	
+	public function toJSON(bool $justArray): string|array {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		
+		if ($this->name) {
+			$jsonArray['name'] = $this->name;
+		} else {
+			$jsonArray['name'] = '';
+		}
+		
+		$jsonArray['nodes'] = [];
+		foreach ($this->nodes as $Node) {
+			$jsonArray['nodes'] []= $Node->toJSON(true);
+		}
+		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		return json_encode($jsonArray);
+	}
+	
+	public function setFromJSON(string|array $jsonArray): void {
+		if (!is_array($jsonArray)) {
+			$jsonArray = json_decode($jsonArray, true);
+		}
+		
+		$this->name = $jsonArray['name'];
+		
+		if (isset($jsonArray['labels'])) {
+			$this->labels = $jsonArray['labels'];
+		} else {
+			$this->labels = [];
+		}
+		
+		if (isset($jsonArray['nodes'])) {
+			foreach ($jsonArray['nodes'] as $nodeArray) {
+				$Node = new Node();
+				$Node->setConversation($this);
+				$this->nodes []= $Node;
+				$Node->setFromJSON($nodeArray);
+			}
+		}
+	}
 }
 
 // This serves multiple purposes:
@@ -621,6 +772,7 @@ class Conversation {
 //   element whose "next" member is followed.
 #[ORM\Entity]
 #[ORM\Table(name: 'ConversationElement')]
+#[ApiResource]
 class Element {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -634,7 +786,7 @@ class Element {
 	public int $next;
 	// Conditions for displaying the text:
 	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\ConditionSet', mappedBy: 'conversationNodeElement', cascade: ['persist'])]
-	public ConditionSet $conditions;
+	public ?ConditionSet $conditions = null;
 	
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Node', inversedBy: 'elements')]
 	#[ORM\JoinColumn(nullable: false, name: 'nodeId')]
@@ -647,6 +799,56 @@ class Element {
 	public function setNode($node): void {
 		$this->node = $node;
 	}
+	
+	public function getId(): int {
+		return $this->id;
+	}
+	
+	public function getText(): string {
+		return $this->text;
+	}
+	
+	public function getNext(): int {
+		return $this->next;
+	}
+	
+	public function getConditions(): ConditionSet {
+		return $this->conditions;
+	}
+	
+	public function getNode(): Node {
+		return $this->node;
+	}
+	
+	public function toJSON(bool $justArray=false): string|array {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		$jsonArray['text'] = $this->text;
+		$jsonArray['next'] = $this->next;
+		
+		$jsonArray['conditions'] = $this->conditions?->toJSON(true);
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		return json_encode($jsonArray);
+	}
+	
+	public function setFromJSON(string|array $jsonArray): void {
+		if (!is_array($jsonArray)) {
+			$jsonArray = json_decode($jsonArray, true);
+		}
+		
+		$this->text = $jsonArray['text'];
+		$next = $jsonArray['next'];
+		if (!is_numeric($jsonArray['next'])) {
+			$next = $this->node->getConversation()->getLabels()[$next] ?? -1;
+		} 
+		$this->next = $next;
+		
+		$this->conditions->setFromJSON($jsonArray['conditions']);
+	}
 };
 
 // The conversation is a network of "nodes" that you travel between by
@@ -654,6 +856,7 @@ class Element {
 // variable values for the current player).
 #[ORM\Entity]
 #[ORM\Table(name: 'ConversationNode')]
+#[ApiResource]
 class Node {
 	#[ORM\Id]
 	#[ORM\GeneratedValue]
@@ -666,11 +869,14 @@ class Node {
 	
 	// Construct a new node. Each paragraph of conversation that involves no
 	// choice can be merged into what came before it, to simplify things.
-	public function __construct(public bool $isChoice = false) {
+	public function __construct(bool $isChoice = false) {
 		$this->conditions = new ConditionSet();
+		$this->conditions->setConversationNode($this);
 		$this->actions = new GameAction();
+		$this->actions->setConversationNode($this);
 		$this->canMergeOnto = !$isChoice;
 		$this->elements = new ArrayCollection();
+		$this->isChoice = $isChoice;
 	}
 	
 	public function setConversation(Conversation $conversation): void {
@@ -691,12 +897,78 @@ class Node {
 	// this value is false, a one-element node is considered text, and a
 	// node with more than one element is considered is considered a
 	// "branch".
-	//public bool $isChoice;
+	#[ORM\Column(type: 'boolean')]
+	public bool $isChoice = false;
 	// Keep track of whether it's possible to merge future nodes onto this.
 	#[ORM\Column(type: 'boolean')]
 	public bool $canMergeOnto;
+	
+	#[ORM\Column(type: 'string')]
+	public string $branchName = '';
 
 	// Image that should be shown along with this text.
 	#[ORM\ManyToOne(targetEntity: 'App\Entity\Sky\Sprite', cascade: ['persist'])]
 	public ?Sprite $scene = null;
+	
+	public function getId(): int {
+		return $this->id;
+	}
+	public function setId(int $id): self {
+		$this->id = $id;
+		return $this;
+	}
+	
+	public function getConversation(): Conversation {
+		return $this->conversation;
+	}
+	
+	public function toJSON(bool $justArray=false): string|array {
+		$jsonArray = [];
+		
+		$jsonArray['id'] = $this->id;
+		$jsonarray['canMergeOnto'] = $this->canMergeOnto;
+		$jsonArray['isChoice'] = $this->isChoice;
+		
+		$jsonArray['scene'] = $this->scene?->getName();
+		
+		$jsonArray['conditionSet'] = $this->conditions->toJSON(true);
+		$jsonArray['actions'] = $this->actions->toJSON(true);
+		
+		$jsonArray['elements'] = [];
+		foreach ($this->elements as $Element) {
+			$jsonArray['elements'] []= $Element->toJSON(true);
+		}
+		
+		if ($justArray) {
+			return $jsonArray;
+		}
+		return json_encode($jsonArray);
+	}
+	
+	public function setFromJSON(string|array $jsonArray): void {
+		if (!is_array($jsonArray)) {
+			$jsonArray = json_decode($jsonArray, true);
+		}
+		
+		$this->isChoice = $jsonArray['isChoice'];
+		if ($jsonArray['scene']) {
+			$this->scene = SpriteSet::Get($jsonArray['scene']); // TODO: handle "ad hoc" scenes, added just now
+		}
+		$this->conditions->setFromJSON($jsonArray['conditionSet']);
+		//$this->actions->setFromJSON($jsonArray['actions']);
+		
+		if (isset($jsonArray['elements'])) {
+			foreach ($jsonArray['elements'] as $elementArray) {
+				$Element = new Element();
+				$Element->setNode($this);
+				$this->elements []= $Element;
+				$Element->setFromJSON($elementArray);
+			}
+		}
+	}
+	
+	public function isBranch(): bool {
+		return !$this->conditions->isEmpty() && count($this->elements) > 1;
+	}
+
 };

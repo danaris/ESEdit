@@ -5,10 +5,14 @@ namespace App\Entity\Sky;
 use App\Repository\Sky\CargoHoldRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Event\PostLoadEventArgs;
 
 use App\Entity\DataWriter;
+use App\Entity\DataNode;
 
 #[ORM\Entity(repositoryClass: CargoHoldRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 class CargoHold
 {
     #[ORM\Id]
@@ -24,9 +28,11 @@ class CargoHold
 
     #[ORM\Column(type: Types::TEXT)]
     private ?string $commoditiesStr = null;
+	private array $commodities = [];
 
     #[ORM\Column(type: Types::TEXT)]
     private ?string $outfitsStr = null;
+	private array $outfits = [];
 	
 	private $missionCargo;
 	private $missionPassengers;
@@ -60,7 +66,7 @@ class CargoHold
         return $this;
     }
 
-    public function getCommodities(): ?string
+    public function getCommodities(): array
     {
         return $this->commodities;
     }
@@ -83,6 +89,14 @@ class CargoHold
 
         return $this;
     }
+
+	public function getOutfits(): array {
+		return $this->outfits;
+	}
+
+	public function load(DataNode $node): void {
+		// TODO!
+	}
 	
 	// Save the cargo manifest to a file.
 	public function save(DataWriter $out): void
@@ -140,5 +154,17 @@ class CargoHold
 	// 
 	// 	// Mission cargo is not saved because it is repopulated when the missions
 	// 	// are read rather than when the cargo is read.
+	}
+	
+	#[ORM\PreFlush]
+	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		$this->commoditiesStr = json_encode($this->commodities);
+		$this->outfitsStr = json_encode($this->outfits);
+	}
+	
+	#[ORM\PostLoad]
+	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		$this->commodities = json_decode($this->commoditiesStr, true);
+		$this->outfits = json_decode($this->outfitsStr, true);
 	}
 }

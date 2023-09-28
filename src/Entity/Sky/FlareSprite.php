@@ -83,7 +83,7 @@ class FlareSprite
 	
 	#[ORM\PrePersist]
 	public function prePersist() {
-		error_log('Persisting flare sprite '.$this);
+		//error_log('Persisting flare sprite '.$this);
 	}
 	
 	public function __toString(): string {

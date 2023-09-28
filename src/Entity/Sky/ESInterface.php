@@ -95,7 +95,7 @@ class ESInterface {
 	
 	// Check if a named point exists.
 	public function hasPoint(string $name): bool {
-		return in_array($name, $this->points);
+		return $this->points->has($name);
 	}
 	
 	// Get the center of the named point.
@@ -159,7 +159,7 @@ class AnchoredPoint {
 	// Get the point's location, given the current screen dimensions.
 	public function get(): Point {
 		// Putting in a placeholder screen size, because this won't be able to get the real one
-		return $this->position->add((new Point(3840,2160))->mult($this->anchor)->mult(0.5));
+		return $this->position->add((new Point(3840,2160))->multPoint($this->anchor)->mult(0.5));
 	}
 	
 	public function set(Point $position, Point $anchor) {
@@ -331,9 +331,9 @@ public function parseLine(DataNode $node): bool {
 	// The "inactive" and "hover" sprite only applies to non-dynamic images.
 	// The "colored" tag only applies to outlines.
 	if ($node->getToken(0) == "inactive" && $node->size() >= 2 && $this->name == '') {
-		$this->sprite[Element::INACTIVE] = SpriteSet::Get($node->getToken(1));
+		$this->sprite[UIElement::INACTIVE] = SpriteSet::Get($node->getToken(1));
 	} else if($node->getToken(0) == "hover" && $node->size() >= 2 && $this->name == '') {
-		$this->sprite[Element::HOVER] = SpriteSet::Get($node->getToken(1));
+		$this->sprite[UIElement::HOVER] = SpriteSet::Get($node->getToken(1));
 	} else if ($this->isOutline && $node->getToken(0) == "colored") {
 		$this->isColored = true;
 	} else {

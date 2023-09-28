@@ -74,7 +74,7 @@ class ShipManager {
 				$out->write("with outfits");
 			}
 			if ($this->requireOutfits) {
-				outwrite("require outfits");
+				$out->write("require outfits");
 			}
 		}
 		$out->endChild();

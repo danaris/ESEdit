@@ -16,41 +16,41 @@ use App\Entity\Sky\OutfitAttributes;
 #[ORM\HasLifecycleCallbacks]
 class Outfit extends Weapon {
 	#[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'integer')]
-    protected int $id;
+	#[ORM\GeneratedValue]
+	#[ORM\Column(type: 'integer')]
+	protected int $id;
 	
 	#[ORM\Column(type: 'boolean', name: 'isDefined')]
-    protected bool $isDefined = false;
+	protected bool $isDefined = false;
 	
 	#[ORM\Column(type: 'string', name: 'trueName')]
-    protected string $trueName = '';
+	protected string $trueName = '';
 	
 	#[ORM\Column(type: 'string', name: 'displayName')]
-    protected string $displayName = '';
+	protected string $displayName = '';
 	
 	#[ORM\Column(type: 'string', name: 'pluralName')]
-    protected string $pluralName = '';
+	protected string $pluralName = '';
 	
 	#[ORM\Column(type: 'string', name: 'category')]
-    protected string $category = '';
+	protected string $category = '';
 	
 	// The series that this outfit is a part of and its index within that series.
 	// Used for sorting within shops.
 	#[ORM\Column(type: 'string', name: 'series')]
-    protected string $series = '';
+	protected string $series = '';
 	
 	#[ORM\Column(type: 'integer', name: 'seriesIndex')]
-    protected int $index = -1;
+	protected int $index = -1;
 	
 	#[ORM\Column(type: 'text', name: 'description')]
-    protected string $description = '';
+	protected string $description = '';
 	
 	#[ORM\Column(type: 'bigint', name: 'cost')]
-    protected int $cost = 0;
+	protected int $cost = 0;
 	
 	#[ORM\Column(type: 'float', name: 'mass')]
-    protected float $mass = 0.;
+	protected float $mass = 0.;
 	
 	// Licenses needed to purchase this item.
 	protected array $licenses = []; //vector<string>
@@ -98,19 +98,16 @@ class Outfit extends Weapon {
     #[ORM\OneToMany(mappedBy: 'outfit', targetEntity: OutfitAttributes::class, orphanRemoval: true, cascade: ['persist'])]
     protected Collection $outfitAttributes;
 	protected array $attributes = [];
+
+    #[ORM\ManyToMany(targetEntity: Sale::class, mappedBy: 'outfits')]
+    private Collection $outfitters;
 	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
 		if ($this->isWeapon) {
 			parent::toDatabase($eventArgs);
 		}
-		$em = $eventArgs->getEntityManager();
-		if (substr($this->trueName,-10) == 'Attributes') {
-			error_log('Handling pre-flush for '.$this->trueName);
-			if ($this->trueName == 'Deep River Attributes') {
-				error_log('Found it');
-			}
-		}
+		$em = $eventArgs->getObjectManager();
 		$handledAttributes = [];
 		foreach ($this->outfitAttributes as $OutfitAttribute) {
 			$handled = false;
@@ -266,150 +263,150 @@ class Outfit extends Weapon {
 		// specific usage of the attribute, the allowed minimum value is chosen to avoid
 		// disallowed or undesirable behaviors (such as dividing by zero).
 	const MINIMUM_OVERRIDES = [
-        // Attributes which are present and map to zero may have any value.
-        "shield generation" => 0.0,
-        "shield energy" => 0.0,
-        "shield fuel" => 0.0,
-        "shield heat" => 0.0,
-        "hull repair rate" => 0.0,
-        "hull energy" => 0.0,
-        "hull fuel" => 0.0,
-        "hull heat" => 0.0,
-        "hull threshold" => 0.0,
-        "energy generation" => 0.0,
-        "energy consumption" => 0.0,
-        "fuel generation" => 0.0,
-        "fuel consumption" => 0.0,
-        "fuel energy" => 0.0,
-        "fuel heat" => 0.0,
-        "heat generation" => 0.0,
-        "flotsam chance" => 0.0,
-        
-        "thrusting shields" => 0.0,
-        "thrusting hull" => 0.0,
-        "thrusting energy" => 0.0,
-        "thrusting fuel" => 0.0,
-        "thrusting heat" => 0.0,
-        "thrusting discharge" => 0.0,
-        "thrusting corrosion" => 0.0,
-        "thrusting ion" => 0.0,
-        "thrusting leakage" => 0.0,
-        "thrusting burn" => 0.0,
-        "thrusting disruption" => 0.0,
-        "thrusting slowing" => 0.0,
-        
-        "turning shields" => 0.0,
-        "turning hull" => 0.0,
-        "turning energy" => 0.0,
-        "turning fuel" => 0.0,
-        "turning heat" => 0.0,
-        "turning discharge" => 0.0,
-        "turning corrosion" => 0.0,
-        "turning ion" => 0.0,
-        "turning leakage" => 0.0,
-        "turning burn" => 0.0,
-        "turning disruption" => 0.0,
-        "turning slowing" => 0.0,
-        
-        "reverse thrusting shields" => 0.0,
-        "reverse thrusting hull" => 0.0,
-        "reverse thrusting energy" => 0.0,
-        "reverse thrusting fuel" => 0.0,
-        "reverse thrusting heat" => 0.0,
-        "reverse thrusting discharge" => 0.0,
-        "reverse thrusting corrosion" => 0.0,
-        "reverse thrusting ion" => 0.0,
-        "reverse thrusting leakage" => 0.0,
-        "reverse thrusting burn" => 0.0,
-        "reverse thrusting disruption" => 0.0,
-        "reverse thrusting slowing" => 0.0,
-        
-        "afterburner shields" => 0.0,
-        "afterburner hull" => 0.0,
-        "afterburner energy" => 0.0,
-        "afterburner fuel" => 0.0,
-        "afterburner heat" => 0.0,
-        "afterburner discharge" => 0.0,
-        "afterburner corrosion" => 0.0,
-        "afterburner ion" => 0.0,
-        "afterburner leakage" => 0.0,
-        "afterburner burn" => 0.0,
-        "afterburner disruption" => 0.0,
-        "afterburner slowing" => 0.0,
-        
-        "cooling energy" => 0.0,
-        "discharge resistance energy" => 0.0,
-        "discharge resistance fuel" => 0.0,
-        "discharge resistance heat" => 0.0,
-        "corrosion resistance energy" => 0.0,
-        "corrosion resistance fuel" => 0.0,
-        "corrosion resistance heat" => 0.0,
-        "ion resistance energy" => 0.0,
-        "ion resistance fuel" => 0.0,
-        "ion resistance heat" => 0.0,
-        "scramble resistance energy" => 0.0,
-        "scramble resistance fuel" => 0.0,
-        "scramble resistance heat" => 0.0,
-        "leak resistance energy" => 0.0,
-        "leak resistance fuel" => 0.0,
-        "leak resistance heat" => 0.0,
-        "burn resistance energy" => 0.0,
-        "burn resistance fuel" => 0.0,
-        "burn resistance heat" => 0.0,
-        "disruption resistance energy" => 0.0,
-        "disruption resistance fuel" => 0.0,
-        "disruption resistance heat" => 0.0,
-        "slowing resistance energy" => 0.0,
-        "slowing resistance fuel" => 0.0,
-        "slowing resistance heat" => 0.0,
-        "crew equivalent" => 0.0,
-        
-        // "Protection" attributes appear in denominators and are incremented by 1.
-        "shield protection" => -0.99,
-        "hull protection" => -0.99,
-        "energy protection" => -0.99,
-        "fuel protection" => -0.99,
-        "heat protection" => -0.99,
-        "piercing protection" => -0.99,
-        "force protection" => -0.99,
-        "discharge protection" => -0.99,
-        "drag reduction" => -0.99,
-        "corrosion protection" => -0.99,
-        "inertia reduction" => -0.99,
-        "ion protection" => -0.99,
-        "scramble protection" => -0.99,
-        "leak protection" => -0.99,
-        "burn protection" => -0.99,
-        "disruption protection" => -0.99,
-        "slowing protection" => -0.99,
-        
-        // "Multiplier" attributes appear in numerators and are incremented by 1.
-        "hull repair multiplier" => -1.0,
-        "hull energy multiplier" => -1.0,
-        "hull fuel multiplier" => -1.0,
-        "hull heat multiplier" => -1.0,
-        "shield generation multiplier" => -1.0,
-        "shield energy multiplier" => -1.0,
-        "shield fuel multiplier" => -1.0,
-        "shield heat multiplier" => -1.0
+	    // Attributes which are present and map to zero may have any value.
+	    "shield generation" => 0.0,
+	    "shield energy" => 0.0,
+	    "shield fuel" => 0.0,
+	    "shield heat" => 0.0,
+	    "hull repair rate" => 0.0,
+	    "hull energy" => 0.0,
+	    "hull fuel" => 0.0,
+	    "hull heat" => 0.0,
+	    "hull threshold" => 0.0,
+	    "energy generation" => 0.0,
+	    "energy consumption" => 0.0,
+	    "fuel generation" => 0.0,
+	    "fuel consumption" => 0.0,
+	    "fuel energy" => 0.0,
+	    "fuel heat" => 0.0,
+	    "heat generation" => 0.0,
+	    "flotsam chance" => 0.0,
+	    
+	    "thrusting shields" => 0.0,
+	    "thrusting hull" => 0.0,
+	    "thrusting energy" => 0.0,
+	    "thrusting fuel" => 0.0,
+	    "thrusting heat" => 0.0,
+	    "thrusting discharge" => 0.0,
+	    "thrusting corrosion" => 0.0,
+	    "thrusting ion" => 0.0,
+	    "thrusting leakage" => 0.0,
+	    "thrusting burn" => 0.0,
+	    "thrusting disruption" => 0.0,
+	    "thrusting slowing" => 0.0,
+	    
+	    "turning shields" => 0.0,
+	    "turning hull" => 0.0,
+	    "turning energy" => 0.0,
+	    "turning fuel" => 0.0,
+	    "turning heat" => 0.0,
+	    "turning discharge" => 0.0,
+	    "turning corrosion" => 0.0,
+	    "turning ion" => 0.0,
+	    "turning leakage" => 0.0,
+	    "turning burn" => 0.0,
+	    "turning disruption" => 0.0,
+	    "turning slowing" => 0.0,
+	    
+	    "reverse thrusting shields" => 0.0,
+	    "reverse thrusting hull" => 0.0,
+	    "reverse thrusting energy" => 0.0,
+	    "reverse thrusting fuel" => 0.0,
+	    "reverse thrusting heat" => 0.0,
+	    "reverse thrusting discharge" => 0.0,
+	    "reverse thrusting corrosion" => 0.0,
+	    "reverse thrusting ion" => 0.0,
+	    "reverse thrusting leakage" => 0.0,
+	    "reverse thrusting burn" => 0.0,
+	    "reverse thrusting disruption" => 0.0,
+	    "reverse thrusting slowing" => 0.0,
+	    
+	    "afterburner shields" => 0.0,
+	    "afterburner hull" => 0.0,
+	    "afterburner energy" => 0.0,
+	    "afterburner fuel" => 0.0,
+	    "afterburner heat" => 0.0,
+	    "afterburner discharge" => 0.0,
+	    "afterburner corrosion" => 0.0,
+	    "afterburner ion" => 0.0,
+	    "afterburner leakage" => 0.0,
+	    "afterburner burn" => 0.0,
+	    "afterburner disruption" => 0.0,
+	    "afterburner slowing" => 0.0,
+	    
+	    "cooling energy" => 0.0,
+	    "discharge resistance energy" => 0.0,
+	    "discharge resistance fuel" => 0.0,
+	    "discharge resistance heat" => 0.0,
+	    "corrosion resistance energy" => 0.0,
+	    "corrosion resistance fuel" => 0.0,
+	    "corrosion resistance heat" => 0.0,
+	    "ion resistance energy" => 0.0,
+	    "ion resistance fuel" => 0.0,
+	    "ion resistance heat" => 0.0,
+	    "scramble resistance energy" => 0.0,
+	    "scramble resistance fuel" => 0.0,
+	    "scramble resistance heat" => 0.0,
+	    "leak resistance energy" => 0.0,
+	    "leak resistance fuel" => 0.0,
+	    "leak resistance heat" => 0.0,
+	    "burn resistance energy" => 0.0,
+	    "burn resistance fuel" => 0.0,
+	    "burn resistance heat" => 0.0,
+	    "disruption resistance energy" => 0.0,
+	    "disruption resistance fuel" => 0.0,
+	    "disruption resistance heat" => 0.0,
+	    "slowing resistance energy" => 0.0,
+	    "slowing resistance fuel" => 0.0,
+	    "slowing resistance heat" => 0.0,
+	    "crew equivalent" => 0.0,
+	    
+	    // "Protection" attributes appear in denominators and are incremented by 1.
+	    "shield protection" => -0.99,
+	    "hull protection" => -0.99,
+	    "energy protection" => -0.99,
+	    "fuel protection" => -0.99,
+	    "heat protection" => -0.99,
+	    "piercing protection" => -0.99,
+	    "force protection" => -0.99,
+	    "discharge protection" => -0.99,
+	    "drag reduction" => -0.99,
+	    "corrosion protection" => -0.99,
+	    "inertia reduction" => -0.99,
+	    "ion protection" => -0.99,
+	    "scramble protection" => -0.99,
+	    "leak protection" => -0.99,
+	    "burn protection" => -0.99,
+	    "disruption protection" => -0.99,
+	    "slowing protection" => -0.99,
+	    
+	    // "Multiplier" attributes appear in numerators and are incremented by 1.
+	    "hull repair multiplier" => -1.0,
+	    "hull energy multiplier" => -1.0,
+	    "hull fuel multiplier" => -1.0,
+	    "hull heat multiplier" => -1.0,
+	    "shield generation multiplier" => -1.0,
+	    "shield energy multiplier" => -1.0,
+	    "shield fuel multiplier" => -1.0,
+	    "shield heat multiplier" => -1.0
 	];
 	
 	public static function AddFlareSprites(array /*vector<pair<Body, int>>*/ &$thisFlares, array /*pair<Body, int>*/ $it, int $count): void {
-        $flare = null;
-        foreach ($thisFlares as $flareData) {
+	    $flare = null;
+	    foreach ($thisFlares as $flareData) {
         	if ($flareData['body']->getSprite() == $it['body']->getSprite()) {
         		$flareData['count'] += $count * $it['count'];
         		return;
         	}
-        }
-        
-        $thisFlares []= ['body'=>$it['body'], 'count'=>$it['count'] * $count];
+	    }
+	    
+	    $thisFlares []= ['body'=>$it['body'], 'count'=>$it['count'] * $count];
 	}
 	
 	// Used to add the contents of one outfit's map to another, while also
 	// erasing any key with a value of zero.
 	public static function MergeMaps(array &$thisMap, array &$otherMap, int $count): void {
-        foreach ($otherMap as $otherName => $otherData) {
+	    foreach ($otherMap as $otherName => $otherData) {
         	if (!isset($thisMap[$otherName])) {
         		$thisMap[$otherName] = ['val'=>$otherData['val'], 'count'=>$otherData['count'] * $count];
         	} else {
@@ -420,34 +417,40 @@ class Outfit extends Weapon {
         	if ($thisMap[$otherName]['val'] == null) {
         		unset($thisMap[$otherName]);
         	}
-        }
+	    }
 	}
 	
 	public function __construct(?DataNode $node = null) {
-        parent::__construct();
-        if ($node) {
+	    parent::__construct();
+	    if ($node) {
         	$this->load($node);
-        }
+	    }
 		$this->penalties = new ArrayCollection();
 		$this->outfitAttributes = new ArrayCollection();
 		$this->flareSpriteCollection = new ArrayCollection();
 		$this->flareSoundCollection = new ArrayCollection();
 		$this->effectCollection = new ArrayCollection();
 		$this->jumpSoundCollection = new ArrayCollection();
+                 $this->outfitters = new ArrayCollection();
 	}
 	
 	public function load(DataNode $node): void {
-        if ($node->size() >= 2) {
+	    if ($node->size() >= 2) {
         	$this->trueName = $node->getToken(1);
-        }
-		
-		if ($this->trueName == 'attributes') {
-			error_log('Found the attributes outfit!');
+	    }
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
 		}
+		
+		// if ($this->trueName == 'attributes') {
+		// 	error_log('Found the attributes outfit!');
+		// }
 	
-        $this->isDefined = true;
+	    $this->isDefined = true;
 	
-        foreach ($node as $child) {
+	    foreach ($node as $child) {
         	if ($child->getToken(0) == "display name" && $child->size() >= 2) {
         		$this->displayName = $child->getToken(1);
         	} else if ($child->getToken(0) == "category" && $child->size() >= 2) {
@@ -586,48 +589,48 @@ class Outfit extends Weapon {
         		// Jump range must be positive.
         		$this->attributes[$child->getToken(0)] = max(0.0, $child->getValue(1));
         	} else if ($child->size() >= 2) {
-				if ($child->getToken(0) == "hull") {
-					error_log('Found a hull attribute for '.$this->trueName.' at '.$child->getValue(1));
-				}
+				// if ($child->getToken(0) == "hull") {
+				// 	error_log('Found a hull attribute for '.$this->trueName.' at '.$child->getValue(1));
+				// }
         		$this->attributes[$child->getToken(0)] = $child->getValue(1);
         	} else {
         		$child->printTrace("Skipping unrecognized attribute:");
         	}
-        }
+	    }
 	
-        if ($this->displayName == '') {
+	    if ($this->displayName == '') {
         	$this->displayName = $this->trueName;
-        }
+	    }
 	
-        // If no plural name has been defined, append an 's' to the name and use that.
-        // If the name ends in an 's' or 'z', and no plural name has been defined, print a
-        // warning since an explicit plural name is always required in this case.
-        // Unless this outfit definition isn't declared with the `outfit` keyword,
-        // because then this is probably being done in `add attributes` on a ship,
-        // so the name doesn't matter.
-        if ($this->displayName != '' && $this->pluralName == '') {
+	    // If no plural name has been defined, append an 's' to the name and use that.
+	    // If the name ends in an 's' or 'z', and no plural name has been defined, print a
+	    // warning since an explicit plural name is always required in this case.
+	    // Unless this outfit definition isn't declared with the `outfit` keyword,
+	    // because then this is probably being done in `add attributes` on a ship,
+	    // so the name doesn't matter.
+	    if ($this->displayName != '' && $this->pluralName == '') {
         	$this->pluralName = $this->displayName . 's';
         	if ((substr($this->displayName, -1) == 's' || substr($this->displayName, -1) == 'z') && $node->getToken(0) == "outfit") {
-        		$node->printTrace("Warning: explicit plural name definition required, but none is provided. Defaulting to \"" . $pluralName . "\".");
+        		$node->printTrace("Warning: explicit plural name definition required, but none is provided. Defaulting to \"" . $this->pluralName . "\".");
         	}
-        }
+	    }
 	
-        // Only outfits with the jump drive and jump range attributes can
-        // use the jump range, so only keep track of the jump range on
-        // viable outfits.
-        if (isset($this->attributes["jump drive"]) && isset($this->attributes["jump range"])) {
-        	GameData::AddJumpRange($this->attributes["jump range"]);
-        }
+	    // Only outfits with the jump drive and jump range attributes can
+	    // use the jump range, so only keep track of the jump range on
+	    // viable outfits.
+	    // if (isset($this->attributes["jump drive"]) && isset($this->attributes["jump range"])) {
+        // 	GameData::AddJumpRange($this->attributes["jump range"]);
+	    // }
 	
-        // Legacy support for turrets that don't specify a turn rate:
-        if ($this->isWeapon() && isset($this->attributes["turret mounts"]) && !$this->getTurretTurn() && !$this->getAntiMissile()) {
+	    // Legacy support for turrets that don't specify a turn rate:
+	    if ($this->isWeapon() && isset($this->attributes["turret mounts"]) && !$this->getTurretTurn() && !$this->getAntiMissile()) {
         	$this->setTurretTurn(4.0);
         	$node->printTrace("Warning: Deprecated use of a turret without specified \"turret turn\":");
-        }
-        // Convert any legacy cargo / outfit scan definitions into power & speed,
-        // so no runtime code has to check for both.
-        $this->convertScan("outfit", $node);
-        $this->convertScan("cargo", $node);
+	    }
+	    // Convert any legacy cargo / outfit scan definitions into power & speed,
+	    // so no runtime code has to check for both.
+	    $this->convertScan("outfit", $node);
+	    $this->convertScan("cargo", $node);
 	}
 	
 	public function copy(): Outfit {
@@ -668,13 +671,13 @@ class Outfit extends Weapon {
 	}
 	
 	protected function convertScan($kind, $node): void {
-        $label = $kind . " scan";
-        $initial = 0.0;
-        if (isset($this->attributes[$label])) {
+	    $label = $kind . " scan";
+	    $initial = 0.0;
+	    if (isset($this->attributes[$label])) {
         	$initial = $this->attributes[$label];
         	$this->attributes[$label] = 0.;
         	$node->printTrace("Warning: Deprecated use of \"" . $label . "\" instead of \"" . $label . " power\" and \"" . $label . " speed\":");
-        
+	    
         	// A scan value of 300 is equivalent to a scan power of 9.
         	$this->attributes[$label + " power"] += $initial * $initial * .0001;
         	// The default scan speed of 1 is unrelated to the magnitude of the scan value.
@@ -682,12 +685,12 @@ class Outfit extends Weapon {
         	if (!$this->attributes[$label + " efficiency"]) {
         		$this->attributes[$label + " efficiency"] = 15.;
         	}
-        }
-        
-        // Similar check for scan speed which is replaced with scan efficiency.
-        $label .= " speed";
-        $initial = 0.0;
-        if (isset($this->attributes[$label])) {
+	    }
+	    
+	    // Similar check for scan speed which is replaced with scan efficiency.
+	    $label .= " speed";
+	    $initial = 0.0;
+	    if (isset($this->attributes[$label])) {
         	$initial = $this->attributes[$label];
         	$this->attributes[$label] = 0.;
         	$node->printTrace("Warning: Deprecated use of \"" . $label . "\" instead of \"" . $kind . " scan efficiency\":");
@@ -695,18 +698,18 @@ class Outfit extends Weapon {
         	// is 10x what it was before scan efficiency was introduced, along with
         	// ships which are larger or further away also increasing the scan time.
         	$this->attributes[$kind + " scan efficiency"] += $initial * 15.;
-        }
+	    }
 	}
 	
 	// Check if this outfit has been defined via Outfit::Load (vs. only being referred to).
 	public function isDefined(): bool {
-        return $this->isDefined;
+	    return $this->isDefined;
 	}
 	
 	// When writing to the player's save, the reference name is used even if this
 	// outfit was not fully defined (i.e. belongs to an inactive plugin).
 	public function getTrueName(): string {
-        return $this->trueName;
+	    return $this->trueName;
 	}
 	public function setTrueName(string $trueName): void {
 		$this->trueName = $trueName;
@@ -716,47 +719,47 @@ class Outfit extends Weapon {
 	}
 	
 	public function getDisplayName(): string {
-        return $this->displayName;
+	    return $this->displayName;
 	}
 	public function setDisplayName(string $displayName): void {
 		$this->displayName = $displayName;
 	}
 	
 	public function setName(string $name): void {
-        $this->trueName = $name;
+	    $this->trueName = $name;
 	}
 	
 	public function getPluralName(): string {
-        return $this->pluralName;
+	    return $this->pluralName;
 	}
 	public function setPluralName(string $pluralName): void {
 		$this->pluralName = $pluralName;
 	}
 	
 	public function getCategory(): string {
-        return $this->category;
+	    return $this->category;
 	}
 	
 	public function getSeries(): string {
-        return $this->series;
+	    return $this->series;
 	}
 	
 	public function getIndex(): int {
-        return $this->index;
+	    return $this->index;
 	}
 	
 	public function Description(): string {
-        return $this->description;
+	    return $this->description;
 	}
 	
 	// Get the licenses needed to purchase this outfit.
 	public function Licenses(): array {
-        return $this->licenses;
+	    return $this->licenses;
 	}
 	
 	// Get the image to display in the outfitter when buying this item.
 	public function getThumbnail(): Sprite {
-        return $this->thumbnail;
+	    return $this->thumbnail;
 	}
 	
 	public function get(string $attribute): float {
@@ -770,7 +773,7 @@ class Outfit extends Weapon {
 	}
 	
 	public function getAttributes(): array {
-        return $this->attributes;
+	    return $this->attributes;
 	}
 	
 	public function getCost(): int {
@@ -785,7 +788,7 @@ class Outfit extends Weapon {
 	// be added to a ship with the attributes represented by this instance. If
 	// not, return the maximum number that can be added.
 	public function canAdd(Outfit &$other, int $count): int {
-        foreach ($other->getAttributes() as $attrName => $attrVal) {
+	    foreach ($other->getAttributes() as $attrName => $attrVal) {
         	// The minimum allowed value of most attributes is 0. Some attributes
         	// have special functionality when negative, though, and are therefore
         	// allowed to have values less than 0.
@@ -807,17 +810,17 @@ class Outfit extends Weapon {
         	if ($value + $attrVal * $count < $minimum - Outfit::EPS) {
         		$count = ($value - $minimum) / -$attrVal + Outfit::EPS;
         	}
-        }
+	    }
 	
-        return $count;
+	    return $count;
 	}
 	
 	// For tracking a combination of outfits in a ship: add the given number of
 	// instances of the given outfit to this outfit.
 	public function add(Outfit $other, int $count = 1): void {
-        $this->cost += $other->cost * $count;
-        $this->mass += $other->mass * $count;
-        foreach ($other->attributes as $attrName => $attrVal) {
+	    $this->cost += $other->cost * $count;
+	    $this->mass += $other->mass * $count;
+	    foreach ($other->attributes as $attrName => $attrVal) {
         	if (!isset($this->attributes[$attrName])) {
         		$this->attributes[$attrName] = 0.0;
         	}
@@ -825,97 +828,97 @@ class Outfit extends Weapon {
         	if (abs($this->attributes[$attrName]) < Outfit::EPS) {
         		$this->attributes[$attrName] = 0.0;
         	}
-        }
+	    }
 	
-        foreach ($other->flareSprites as $flareData) {
+	    foreach ($other->flareSprites as $flareData) {
         	Outfit::AddFlareSprites($this->flareSprites, $flareData, $count);
-        }
-        foreach ($other->reverseFlareSprites as $flareData) {
+	    }
+	    foreach ($other->reverseFlareSprites as $flareData) {
         	Outfit::AddFlareSprites($this->reverseFlareSprites, $flareData, $count);
-        }
-        foreach ($other->steeringFlareSprites as $flareData) {
+	    }
+	    foreach ($other->steeringFlareSprites as $flareData) {
         	Outfit::AddFlareSprites($this->steeringFlareSprites, $flareData, $count);
-        }
-        Outfit::MergeMaps($this->flareSounds, $other->flareSounds, $count);
-        Outfit::MergeMaps($this->reverseFlareSounds, $other->reverseFlareSounds, $count);
-        Outfit::MergeMaps($this->steeringFlareSounds, $other->steeringFlareSounds, $count);
-        Outfit::MergeMaps($this->afterburnerEffects, $other->afterburnerEffects, $count);
-        Outfit::MergeMaps($this->jumpEffects, $other->jumpEffects, $count);
-        Outfit::MergeMaps($this->hyperSounds, $other->hyperSounds, $count);
-        Outfit::MergeMaps($this->hyperInSounds, $other->hyperInSounds, $count);
-        Outfit::MergeMaps($this->hyperOutSounds, $other->hyperOutSounds, $count);
-        Outfit::MergeMaps($this->jumpSounds, $other->jumpSounds, $count);
-        Outfit::MergeMaps($this->jumpInSounds, $other->jumpInSounds, $count);
-        Outfit::MergeMaps($this->jumpOutSounds, $other->jumpOutSounds, $count);
+	    }
+	    Outfit::MergeMaps($this->flareSounds, $other->flareSounds, $count);
+	    Outfit::MergeMaps($this->reverseFlareSounds, $other->reverseFlareSounds, $count);
+	    Outfit::MergeMaps($this->steeringFlareSounds, $other->steeringFlareSounds, $count);
+	    Outfit::MergeMaps($this->afterburnerEffects, $other->afterburnerEffects, $count);
+	    Outfit::MergeMaps($this->jumpEffects, $other->jumpEffects, $count);
+	    Outfit::MergeMaps($this->hyperSounds, $other->hyperSounds, $count);
+	    Outfit::MergeMaps($this->hyperInSounds, $other->hyperInSounds, $count);
+	    Outfit::MergeMaps($this->hyperOutSounds, $other->hyperOutSounds, $count);
+	    Outfit::MergeMaps($this->jumpSounds, $other->jumpSounds, $count);
+	    Outfit::MergeMaps($this->jumpInSounds, $other->jumpInSounds, $count);
+	    Outfit::MergeMaps($this->jumpOutSounds, $other->jumpOutSounds, $count);
 	}
 	
 	// Modify this outfit's attributes.
 	public function set(string $attribute, float $value): void {
-        $this->attributes[$attribute] = $value;
+	    $this->attributes[$attribute] = $value;
 	}
 	
 	// Get this outfit's engine flare sprite, if any.
 	public function getFlareSprites(): array {
-        return $this->flareSprites;
+	    return $this->flareSprites;
 	}
 	
 	public function getReverseFlareSprites(): array {
-        return $this->reverseFlareSprites;
+	    return $this->reverseFlareSprites;
 	}
 	
 	public function getSteeringFlareSprites(): array {
-        return $this->steeringFlareSprites;
+	    return $this->steeringFlareSprites;
 	}
 	
 	public function getFlareSounds(): array {
-        return $this->flareSounds;
+	    return $this->flareSounds;
 	}
 	
 	public function getReverseFlareSounds(): array {
-        return $this->reverseFlareSounds;
+	    return $this->reverseFlareSounds;
 	}
 	
 	public function getSteeringFlareSounds(): array {
-        return $this->steeringFlareSounds;
+	    return $this->steeringFlareSounds;
 	}
 	
 	// Get the afterburner effect, if any.
 	public function getAfterburnerEffects(): array {
-        return $this->afterburnerEffects;
+	    return $this->afterburnerEffects;
 	}
 	
 	// Get this outfit's jump effects and sounds, if any.
 	public function getJumpEffects(): array {
-        return $this->jumpEffects;
+	    return $this->jumpEffects;
 	}
 	
 	public function getHyperSounds(): array {
-        return $this->hyperSounds;
+	    return $this->hyperSounds;
 	}
 	
 	public function getHyperInSounds(): array {
-        return $this->hyperInSounds;
+	    return $this->hyperInSounds;
 	}
 	
 	public function getHyperOutSounds(): array {
-        return $this->hyperOutSounds;
+	    return $this->hyperOutSounds;
 	}
 	
 	public function getJumpSounds(): array {
-        return $this->jumpSounds;
+	    return $this->jumpSounds;
 	}
 	
 	public function getJumpInSounds(): array {
-        return $this->jumpInSounds;
+	    return $this->jumpInSounds;
 	}
 	
 	public function getJumpOutSounds(): array {
-        return $this->jumpOutSounds;
+	    return $this->jumpOutSounds;
 	}
 	
 	// Get the sprite this outfit uses when dumped into space.
 	public function getFlotsamSprite(): Sprite {
-        return $this->flotsamSprite;
+	    return $this->flotsamSprite;
 	}
 
     /**
@@ -1120,6 +1123,11 @@ class Outfit extends Weapon {
 		
 		$jsonArray['attributes'] = $this->attributes;
 		
+		$jsonArray['outfitters'] = [];
+		foreach ($this->outfitters as $Outfitter) {
+			$jsonArray['outfitters'] []= $Outfitter->getName();
+		}
+		
 		$jsonArray['flareSprites'] = [];
 		foreach ($this->flareSprites as $flareSpriteData) {
 			$jsonArray['flareSprites'] []= ['body'=>$flareSpriteData['body']->toJSON(true),'count'=>$flareSpriteData['count']];
@@ -1180,6 +1188,8 @@ class Outfit extends Weapon {
 			$jsonArray['jumpOutSounds'] []= ['sound'=>$jumpSoundData['val']->toJSON(true),'count'=>$jumpSoundData['count']];
 		}
 		
+		$jsonArray['source'] = ['name'=>$this->sourceName,'file'=>$this->sourceFile,'version'=>$this->sourceVersion];
+		
 		if ($justArray) {
 			return $jsonArray;
 		}
@@ -1229,5 +1239,32 @@ class Outfit extends Weapon {
 		$this->jumpInSounds = $jsonArray['jumpInSounds'];
 		$this->jumpOutSounds = $jsonArray['jumpOutSounds'];
 	}
+
+    /**
+     * @return Collection<int, Sale>
+     */
+    public function getOutfitters(): Collection
+    {
+        return $this->outfitters;
+    }
+
+    public function addOutfitter(Sale $outfitter): static
+    {
+        if (!$this->outfitters->contains($outfitter)) {
+            $this->outfitters->add($outfitter);
+            $outfitter->addOutfit($this);
+        }
+
+        return $this;
+    }
+
+    public function removeOutfitter(Sale $outfitter): static
+    {
+        if ($this->outfitters->removeElement($outfitter)) {
+            $outfitter->removeOutfit($this);
+        }
+
+        return $this;
+    }
 
 }

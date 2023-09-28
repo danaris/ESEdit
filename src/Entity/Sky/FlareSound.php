@@ -67,4 +67,24 @@ class FlareSound
 
         return $this;
     }
+
+	/**
+	 * Get the value of type
+	 */ 
+	public function getType(): string
+	{
+		return $this->type;
+	}
+
+	/**
+	 * Set the value of type
+	 *
+	 * @return  self
+	 */ 
+	public function setType($type): self
+	{
+		$this->type = $type;
+
+		return $this;
+	}
 }

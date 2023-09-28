@@ -13,12 +13,14 @@ class DataFile implements \Iterator, \ArrayAccess {
 	private string $sourceVersion = '';
 	
 	// Constructor, taking a file path (in UTF-8).
-	public function __construct(array $sourceInfo) {
+	public function __construct(array $sourceInfo, bool $autoLoad=true) {
 		$this->root = new DataNode(source: $sourceInfo);
 		$this->sourceName = $sourceInfo['name'];
-		$this->sourceFile = $sourceInfo['file'];
+		$this->sourceFile = substr($sourceInfo['file'], strlen($sourceInfo['dir']));
 		$this->sourceVersion = $sourceInfo['version'];
-		$this->load($sourceInfo['file']);
+		if ($autoLoad) {
+			$this->load($sourceInfo['file']);
+		}
 	}
 	
 	public function getSource(): array {
@@ -40,6 +42,20 @@ class DataFile implements \Iterator, \ArrayAccess {
 		// Note what file this node is in, so it will show up in error traces.
 		$this->root->addToken("file");
 		$this->root->addToken($path);
+	
+		$this->loadData($data);
+	}
+	
+	// Load from an existing string (in UTF-8).
+	public function loadFromString(string $data, string $dataName = 'web-entry'): void {
+		// As a sentinel, make sure the file always ends in a newline.
+		if (substr($data, -1) != '\n') {
+			$data .= "\n";
+		}
+	
+		// Note what file this node is in, so it will show up in error traces.
+		$this->root->addToken("file");
+		$this->root->addToken($dataName);
 	
 		$this->loadData($data);
 	}

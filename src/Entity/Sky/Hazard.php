@@ -24,6 +24,11 @@ class Hazard extends Weapon {
 			return;
 		}
 		$name = $node->getToken(1);
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
+		}
 	
 		foreach ($node as $child) {
 			$key = $child->getToken(0);

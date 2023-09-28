@@ -5,27 +5,28 @@ namespace App\Entity\Sky;
 use App\Entity\DataNode;
 
 class Format {
-	// 
-	// namespace {
-	// 	// Format an integer value, inserting its digits into the given string in
-	// 	// reverse order and then reversing the string.
-	// 	void FormatInteger(int64_t value, bool isNegative, string &result)
-	// 	{
-	// 		int places = 0;
-	// 		do {
-	// 			if(places && !(places % 3))
-	// 				result += ',';
-	// 			++places;
-	// 
-	// 			result += static_cast<char>('0' + value % 10);
-	// 			value /= 10;
-	// 		} while(value);
-	// 
-	// 		if(isNegative)
-	// 			result += '-';
-	// 
-	// 		reverse(result.begin(), result.end());
-	// 	}
+
+	// Format an integer value, inserting its digits into the given string in
+	// reverse order and then reversing the string.
+	public static function FormatInteger(int $value, bool $isNegative, string &$result) {
+		$places = 0;
+		$zero = mb_ord('0');
+		do {
+			if ($places && !($places % 3)) {
+				$result .= ',';
+			}
+			$places++;
+
+			$result .= mb_chr($zero + $value % 10);
+			$value /= 10;
+		} while($value);
+
+		if ($isNegative) {
+			$result .= '-';
+		}
+
+		$result = strrev($result);
+	}
 	// 
 	// 	// Helper function for ExpandConditions.
 	// 	//
@@ -66,61 +67,54 @@ class Format {
 	// 
 	// 
 	// 
-	// // Convert the given number into abbreviated format with a suffix like
-	// // "M" for million, "B" for billion, or "T" for trillion. Any number
-	// // above 1 quadrillion is instead shown in scientific notation.
-	// string Format::Credits(int64_t value)
-	// {
-	// 	bool isNegative = (value < 0);
-	// 	int64_t absolute = abs(value);
-	// 
-	// 	// If the value is above one quadrillion, show it in scientific notation.
-	// 	if(absolute > 1000000000000000ll)
-	// 	{
-	// 		ostringstream out;
-	// 		out.precision(3);
-	// 		out << static_cast<double>(value);
-	// 		return out.str();
-	// 	}
-	// 
-	// 	// Reserve enough space for something like "-123.456M".
-	// 	string result;
-	// 	result.reserve(8);
-	// 
-	// 	// Handle numbers bigger than a million.
-	// 	static const vector<char> SUFFIX = {'T', 'B', 'M'};
-	// 	static const vector<int64_t> THRESHOLD = {1000000000000ll, 1000000000ll, 1000000ll};
-	// 	for(size_t i = 0; i < SUFFIX.size(); ++i)
-	// 		if(absolute > THRESHOLD[i])
-	// 		{
-	// 			result += SUFFIX[i];
-	// 			int decimals = (absolute / (THRESHOLD[i] / 1000)) % 1000;
-	// 			for(int d = 0; d < 3; ++d)
-	// 			{
-	// 				result += static_cast<char>('0' + decimals % 10);
-	// 				decimals /= 10;
-	// 			}
-	// 			result += '.';
-	// 			absolute /= THRESHOLD[i];
-	// 			break;
-	// 		}
-	// 
-	// 	// Convert the number to a string, adding commas if needed.
-	// 	FormatInteger(absolute, isNegative, result);
-	// 	return result;
-	// }
-	// 
-	// 
-	// 
-	// // Convert the given number into abbreviated format as described in Format::Credits,
-	// // then attach the ' credit' or ' credits' suffix to it.
-	// string Format::CreditString(int64_t value)
-	// {
-	// 	if(value == 1)
-	// 		return "1 credit";
-	// 	else
-	// 		return Credits(value) + " credits";
-	// }
+	// Convert the given number into abbreviated format with a suffix like
+	// "M" for million, "B" for billion, or "T" for trillion. Any number
+	// above 1 quadrillion is instead shown in scientific notation.
+	public static function Credits(int $value): string {
+		$isNegative = ($value < 0);
+		$absolute = abs($value);
+	
+		// If the value is above one quadrillion, show it in scientific notation.
+		if ($absolute > 1000000000000000) {
+			$out = sprintf("%.3e", $value);
+			return $out;
+		}
+	
+		// Reserve enough space for something like "-123.456M".
+		$result = '';
+	
+		// Handle numbers bigger than a million.
+		$suffix = ['T', 'B', 'M'];
+		$threshold = [1000000000000, 1000000000, 1000000];
+		for ($i = 0; $i < count($suffix); $i++) {
+			if ($absolute > $threshold[$i]) {
+				$result .= $suffix[$i];
+				$decimals = ($absolute / ($threshold[$i] / 1000)) % 1000;
+				$result .= $decimals;
+				// for ($d = 0; $d < 3; $d++) {
+				// 	$result .= static_cast<char>('0' + decimals % 10);
+				// 	decimals /= 10;
+				// }
+				$result .= '.';
+				$absolute /= $threshold[$i];
+				break;
+			}
+		}
+
+		// Convert the number to a string, adding commas if needed.
+		self::FormatInteger($absolute, $isNegative, $result);
+		return $result;
+	}
+
+	// Convert the given number into abbreviated format as described in Format::Credits,
+	// then attach the ' credit' or ' credits' suffix to it.
+	public static function CreditString(int $value): string {
+		if ($value == 1) {
+			return "1 credit";
+		} else {
+			return self::Credits($value) + " credits";
+		}
+	}
 	// 
 	// 
 	// 
@@ -291,76 +285,69 @@ class Format {
 	// 
 	// 
 	// 
-	// string Format::Replace(const string &source, const map<string, string> &keys)
-	// {
-	// 	string result;
-	// 	result.reserve(source.length());
-	// 
-	// 	size_t start = 0;
-	// 	size_t search = start;
-	// 	while(search < source.length())
-	// 	{
-	// 		size_t left = source.find('<', search);
-	// 		if(left == string::npos)
-	// 			break;
-	// 
-	// 		size_t right = source.find('>', left);
-	// 		if(right == string::npos)
-	// 			break;
-	// 
-	// 		bool matched = false;
-	// 		++right;
-	// 		size_t length = right - left;
-	// 		for(const auto &it : keys)
-	// 			if(!source.compare(left, length, it.first))
-	// 			{
-	// 				result.append(source, start, left - start);
-	// 				result.append(it.second);
-	// 				start = right;
-	// 				search = start;
-	// 				matched = true;
-	// 				break;
-	// 			}
-	// 
-	// 		if(!matched)
-	// 			search = left + 1;
-	// 	}
-	// 
-	// 	result.append(source, start, source.length() - start);
-	// 	return result;
-	// }
-	// 
-	// 
-	// 
-	// void Format::ReplaceAll(string &text, const string &target, const string &replacement)
-	// {
-	// 	// If the searched string is an empty string, do nothing.
-	// 	if(target.empty())
-	// 		return;
-	// 
-	// 	string newString;
-	// 	newString.reserve(text.length());
-	// 
-	// 	// Index at which to begin searching for the target string.
-	// 	size_t start = 0;
-	// 	size_t matchLength = target.length();
-	// 	// Index at which the target string was found.
-	// 	size_t findPos = string::npos;
-	// 	while((findPos = text.find(target, start)) != string::npos)
-	// 	{
-	// 		newString.append(text, start, findPos - start);
-	// 		newString += replacement;
-	// 		start = findPos + matchLength;
-	// 	}
-	// 
-	// 	// Add the remaining text.
-	// 	newString += text.substr(start);
-	// 
-	// 	text.swap(newString);
-	// }
-	// 
-	// 
-	// 
+	public static function Replace(string &$source, array &$keys): string {
+		$result = '';
+	
+		$start = 0;
+		$search = $start;
+		while ($search < strlen($source)) {
+			$left = strpos($source, '<', $search);
+			if ($left === false) {
+				break;
+			}
+
+			$right = strpos($source, '>', $left);
+			if ($right === false) {
+				break;
+			}
+	
+			$matched = false;
+			$right++;
+			$length = $right - $left;
+			foreach ($keys as $from => $to) {
+				if (substr($from, $left, $length) == $source) {
+					$result .= substr($source, $start, $left - $start);
+					$result .= $to;
+					$start = $right;
+					$search = $start;
+					$matched = true;
+					break;
+				}
+			}
+	
+			if (!$matched)
+				$search = $left + 1;
+		}
+	
+		$result .= substr($source, $start, strlen($source) - $start);
+		return $result;
+	}
+
+	public static function ReplaceAll(string &$text, string $target, string $replacement) {
+		// If the searched string is an empty string, do nothing.
+		if ($target == '') {
+			return;
+		}
+	
+		$newString = '';
+	
+		// Index at which to begin searching for the target string.
+		$start = 0;
+		$matchLength = strlen($target);
+		// Index at which the target string was found.
+		$findPos = strlen($text);
+		while (($findPos = strpos($text, $target, $start)) !== false) {
+			$newString .= substr($text, $start, $findPos - $start);
+			$newString .= $replacement;
+			$start = $findPos + $matchLength;
+		}
+	
+		// Add the remaining text.
+		$newString .= substr($text, $start);
+	
+		return $newString;
+	}
+
 	public static function Capitalize(string $str): string {
 		$result = $str;
 		$first = true;

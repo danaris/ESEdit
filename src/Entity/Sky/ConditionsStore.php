@@ -2,12 +2,53 @@
 
 namespace App\Entity\Sky;
 
+use Doctrine\ORM\Mapping as ORM;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Event\PostLoadEventArgs;
+
 use App\Entity\DataNode;
 use App\Entity\DataWriter;
 
+#[ORM\Entity]
+#[ORM\Table(name: 'ConditionsStore')]
+#[ORM\HasLifecycleCallbacks]
 class ConditionsStore {
+	#[ORM\Id]
+	#[ORM\GeneratedValue]
+	#[ORM\Column(type: 'integer')]
+	private int $id;
+
+	#[ORM\OneToMany(mappedBy: 'conditionsStore', targetEntity: ConditionEntry::class, orphanRemoval: true, cascade: ['persist'])]
+	private Collection $storageCollection; // string => ConditionEntry array
 	private array $storage = []; // string => ConditionEntry array
 	private array $providers = []; // string => DerivedProvider array
+	
+	#[ORM\PreFlush]
+	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		$handledNames = [];
+		foreach ($this->storageCollection as $Entry) {
+			if (isset($this->storage[$Entry->fullKey])) {
+				$Entry->value = $this->storage[$Entry->fullKey]->value;
+				$handledNames []= $Entry->fullKey;
+			} else {
+				$eventArgs->getObjectManager()->remove($Entry);
+			}
+		}
+		foreach ($this->storage as $name => $Entry) {
+			if (!in_array($name, $handledNames)) {
+				$this->storageCollection []= $Entry;
+			}
+		}
+	}
+	
+	#[ORM\PostLoad]
+	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		foreach ($this->storageCollection as $Entry) {
+			$this->storage[$Entry->fullKey] = $Entry;
+		}
+	}
 
 	public function __construct(DataNode $node = null, array /* [string, int] pairs */ $initialConditions = []) {
 		if ($node) {
@@ -17,6 +58,13 @@ class ConditionsStore {
 				$this->set($pair[0], $pair[1]);
 			}
 		}
+	}
+
+	public function getId(): int {
+		return $this->id;
+	}
+	public function setId(int $id): void {
+		$this->id = $id;
 	}
 	
 	public function load(DataNode $node): void {
@@ -60,7 +108,7 @@ class ConditionsStore {
 			return $ce->value;
 		}
 	
-		return $ce->provider->getFunction($name);
+		return ($ce->provider->getFunction)($name);
 	}
 	
 	public function has(string $name): bool {
@@ -73,7 +121,7 @@ class ConditionsStore {
 			return true;
 		}
 	
-		return $ce->provider->hasFunction($name);
+		return ($ce->provider->hasFunction)($name);
 	}
 	
 	// Returns a pair where the boolean indicates if the game has this condition set,
@@ -88,10 +136,10 @@ class ConditionsStore {
 			return [true, $ce->value];
 		}
 	
-		$has = $ce->provider->hasFunction($name);
+		$has = ($ce->provider->hasFunction)($name);
 		$val = 0;
 		if ($has) {
-			$val = $ce->provider->getFunction($name);
+			$val = ($ce->provider->getFunction)($name);
 		}
 	
 		return [$has, $val];
@@ -119,7 +167,7 @@ class ConditionsStore {
 			$ce->value = $value;
 			return true;
 		}
-		return $ce->provider->setFunction($name, $value);
+		return ($ce->provider->setFunction)($name, $value);
 	}
 	
 	// Erase a condition completely, either the local value or by performing
@@ -134,7 +182,7 @@ class ConditionsStore {
 			unset($this->storage[$name]);
 			return true;
 		}
-		return $ce->provider->eraseFunction($name);
+		return ($ce->provider->eraseFunction)($name);
 	}
 	
 	public function offsetExists(mixed $offset): bool {
@@ -183,7 +231,7 @@ class ConditionsStore {
 		$this->storage[$offset] = $entry;
 		$entry->provider = $ceprov->provider;
 		$entry->fullKey = $offset;
-		$entry->provider->setFunction($offset, $value);
+		($entry->provider->setFunction)($offset, $value);
 	}
 	public function offsetUnset(mixed $offset): void {
 		// Search for an exact match and return it if it exists.
@@ -195,7 +243,7 @@ class ConditionsStore {
 		$ceprov = $this->getEntry($offset);
 		// If no prefix provider is found, then just create a new value entry.
 		if ($ceprov) {
-			$ceprov->provider->eraseFunction($offset);
+			($ceprov->provider->eraseFunction)($offset);
 		}
 	}
 	
@@ -221,7 +269,7 @@ class ConditionsStore {
 						$storedEntry->fullKey = $storedName;
 						// ?? what do we do with this? throw runtime_error("Replacing condition entries matching prefixed provider \"" + prefix + "\".");
 						// guessing...
-						throw new \Exception("Replacing condition entries matching prefixed provider \"" . prefix . "\".");
+						throw new \Exception("Replacing condition entries matching prefixed provider \"" . $prefix . "\".");
 					}
 				}
 			}
@@ -231,13 +279,13 @@ class ConditionsStore {
 	
 	// Build a provider for the condition identified by the given name.
 	public function getProviderNamed(string $name): DerivedProvider {
-		if (isset($this->providers[$prefix])) {
-			$provider = $this->providers[$prefix];
+		if (isset($this->providers[$name])) {
+			$provider = $this->providers[$name];
 		} else {
-			$provider = new DerivedProvider($prefix, true);
+			$provider = new DerivedProvider($name, true);
 		}
 		if ($provider->isPrefixProvider) {
-			error_log("Error: Retrieving prefixed provider \"" . name . "\" as named provider.");
+			error_log("Error: Retrieving prefixed provider \"" . $name . "\" as named provider.");
 			$provider->isPrefixProvider = true;
 		} else if ($this->verifyProviderLocation($name, $provider)) {
 			$this->storage[$name]->provider = $provider;
@@ -281,6 +329,10 @@ class ConditionsStore {
 		}
 		
 		return null;
+	}
+
+	public function keys(): array {
+		return array_keys($this->storage);
 	}
 	
 	// Helper function to check if we can safely add a provider with the given name.
@@ -354,18 +406,53 @@ class DerivedProvider {
 	public function setEraseFunction($newEraseFun): void {
 		$this->eraseFunction = $newEraseFun;
 	}
+
+	public function getName(): string {
+		return $this->name;
+	}
+
+	public function isPrefixProvider(): bool {
+		return $this->isPrefixProvider();
+	}
 };
 
 
 // Storage entry for a condition. Can act as a int64_t proxy when operator[] is used for access
 // to conditions in the ConditionsStore.
+
+#[ORM\Entity]
+#[ORM\Table(name: 'ConditionEntry')]
 class ConditionEntry {
+	#[ORM\Id]
+	#[ORM\GeneratedValue]
+	#[ORM\Column(type: 'integer')]
+	private int $id;
+
+	#[ORM\Column(type: 'integer')]
 	public int $value = 0;
 	public ?DerivedProvider $provider = null;
 	// The full keyname for condition we want to access. This full keyname is required
 	// when accessing prefixed providers, because such providers will only know the prefix
 	// part of the key.
+	#[ORM\Column(type: 'string')]
 	public string $fullKey = '';
+
+	#[ORM\ManyToOne(inversedBy: 'storageCollection', targetEntity: ConditionsStore::class)]
+	private ConditionsStore $conditionsStore;
+
+	public function getId(): int {
+		return $this->id;
+	}
+	public function setId(int $id): void {
+		$this->id = $id;
+	}
+	public function getConditionsStore(): ConditionsStore {
+		return $this->conditionsStore;
+	}
+	public function setConditionsStore(ConditionsStore $store): void {
+		$this->conditionsStore = $store;
+	}
+
 	// int64_t proxy helper functions. Those functions allow access to the conditions
 	// using `operator[]` on ConditionsStore.
 	public function __invoke() {
@@ -374,7 +461,7 @@ class ConditionEntry {
 		}
 		
 		$key = $this->fullKey == '' ? $this->provider->getName() : $this->fullKey;
-		return $this->provider->getFunction($key);
+		return ($this->provider->getFunction)($key);
 	}
 	public function set(int $val) {
 		if (!$this->provider) {
@@ -382,7 +469,7 @@ class ConditionEntry {
 		}
 		
 		$key = $this->fullKey == '' ? $this->provider->getName() : $this->fullKey;
-		$this->provider->setFunction($key, $val);
+		($this->provider->setFunction)($key, $val);
 	}
 	public function increment() {
 		if (!$this->provider) {
@@ -390,7 +477,7 @@ class ConditionEntry {
 		}
 		
 		$key = $this->fullKey == '' ? $this->provider->getName() : $this->fullKey;
-		$this->provider->setFunction($key, $this->provider->getFunction($key) + 1);
+		($this->provider->setFunction)($key, ($this->provider->getFunction)($key) + 1);
 	}
 	public function decrement() {
 		if (!$this->provider) {
@@ -398,7 +485,7 @@ class ConditionEntry {
 		}
 		
 		$key = $this->fullKey == '' ? $this->provider->getName() : $this->fullKey;
-		$this->provider->setFunction($key, $this->provider->getFunction($key) - 1);
+		($this->provider->setFunction)($key, ($this->provider->getFunction)($key) - 1);
 	}
 	public function gain(int $val) {
 		if (!$this->provider) {
@@ -406,7 +493,7 @@ class ConditionEntry {
 		}
 		
 		$key = $this->fullKey == '' ? $this->provider->getName() : $this->fullKey;
-		$this->provider->setFunction($key, $this->provider->getFunction($key) + $val);
+		($this->provider->setFunction)($key, ($this->provider->getFunction)($key) + $val);
 	}
 	public function reduce(int $val) {
 		if (!$this->provider) {
@@ -414,6 +501,6 @@ class ConditionEntry {
 		}
 		
 		$key = $this->fullKey == '' ? $this->provider->getName() : $this->fullKey;
-		$this->provider->setFunction($key, $this->provider->getFunction($key) - $val);
+		($this->provider->setFunction)($key, ($this->provider->getFunction)($key) - $val);
 	}
 };

@@ -115,7 +115,7 @@ class UniverseObjects {
 			// override things in folders later in the path.
 			$list = $this->dirList($source['dir'] . 'data/');
 			for ($i = count($list) - 1; $i >= 0; $i--) {
-				$fileSources []= ['name'=>$source['name'], 'file'=>$list[$i], 'version'=>$source['version']];
+				$fileSources []= ['name'=>$source['name'], 'file'=>$list[$i], 'version'=>$source['version'], 'dir'=>$source['dir']];
 			}
 		}
 

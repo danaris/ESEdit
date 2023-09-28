@@ -66,9 +66,38 @@ class Effect extends Body {
 		$this->name = $name;
 	}
 	
+	public function getSourceName(): string {
+		return $this->sourceName;
+	}
+	public function setSourceName(string $sourceName): self {
+		$this->sourceName = $sourceName;
+		return $this;
+	}
+	
+	public function getSourceFile(): string {
+		return $this->sourceFile;
+	}
+	public function setSourceFile(string $sourceFile): self {
+		$this->sourceFile = $sourceFile;
+		return $this;
+	}
+	
+	public function getSourceVersion(): string {
+		return $this->sourceVersion;
+	}
+	public function setSourceVersion(string $sourceVersion): self {
+		$this->sourceVersion = $sourceVersion;
+		return $this;
+	}
+	
 	public function load(DataNode $node) {
 		if ($node->size() > 1) {
 			$this->name = $node->getToken(1);
+		}
+		if ($node->getSourceName()) {
+			$this->sourceName = $node->getSourceName();
+			$this->sourceFile = $node->getSourceFile();
+			$this->sourceVersion = $node->getSourceVersion();
 		}
 		
 		foreach ($node as $child) {
@@ -104,11 +133,13 @@ class Effect extends Body {
 	
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
+		parent::toDatabase($eventArgs);
 		$this->absoluteAngleDegrees = $this->absoluteAngle->getDegrees();
 	}
 	
 	#[ORM\PostLoad]
 	public function fromDatabase(PostLoadEventArgs $eventArgs) {
+		parent::fromDatabase($eventArgs);
 		$this->absoluteAngle = new Angle($this->absoluteAngleDegrees);
 	}
 	
