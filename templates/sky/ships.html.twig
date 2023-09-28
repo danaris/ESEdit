@@ -50,11 +50,24 @@
 <script src="{{ path("SkyOutfitsJS") }}"></script>
 <script src="{{ path("SkyShipsJS") }}"></script>
 <script>
+var humanShipyards = ["Basic Ships","Tarazed Basics","Tarazed Advanced","Southbound Basics","Southbound Advanced","Lionheart Basics","Lionheart Advanced","Betelgeuse Basics","Betelgeuse Advanced","Navy Basics","Navy Advanced","Megaparsec Basics","Megaparsec Advanced","Syndicate Basics","Syndicate Advanced","Northern Pirates","Advanced Northern Pirates","Southern Pirates","Advanced Southern Pirates","Core Pirates","Advanced Core Pirates","Luxury Ships"];
 var shipCategories = {};
 var shipImages = [];
 $(function() {
 	for (var shipId in ships) {
 		var ship = ships[shipId];
+		if (spoilerFree) {
+			var isSpoiler = true;
+			for (var i in ship.shipyards) {
+				if (humanShipyards.includes(ship.shipyards[i])) {
+					isSpoiler = false;
+					break;
+				}
+			}
+			if (isSpoiler) {
+				continue;
+			}
+		}
 		ship.attributesOutfit = outfits[ship.trueModelName+" Base Attributes"];
 		if (ship.variantName) {
 			continue;

@@ -11,6 +11,9 @@
 	fill: black;
 	stroke: rgb(102,102,102);
 }
+.Unexplored-system {
+	stroke: var(--faint);
+}
 .systemName {
 	fill-opacity: 0.7;
 	fill: white;
@@ -94,21 +97,26 @@ function angleBetween(fromPoint, toPoint) {
 var spoilerFreeGovernments = ['Republic','Syndicate','Pirate','Free Worlds'];
 $(function() {
 	for (var systemName in systems) {
+		var showSystem = true;
 		var system = systems[systemName];
 		if (spoilerFree) {
 			if (!spoilerFreeGovernments.includes(system.government)) {
-				continue;
+				showSystem = false;
 			}
 		}
 		var sysStatus = 'unoccupied';
-		if (system.government != 'Uninhabited' && system.inhabited) {
-			sysStatus = 'occupied';
+		var governmentName = 'Unexplored';
+		if (showSystem) {
+			if (system.government != 'Uninhabited' && system.inhabited) {
+				sysStatus = 'occupied';
+			}
+			governmentName = system.government;
 		}
 		var systemSVG = '<use id="'+nameEsc(systemName)+'-system"';
 		if (system.hidden) {
 			systemSVG += ' stroke-opacity="0.5"';
 		}
-		systemSVG += ' class="system '+nameEsc(system.government)+'-system '+sysStatus+'" x="'+(2048 + system.position.x)+'" y="'+(2048 + system.position.y)+'" onclick="showSystem(\''+nameEsc(systemName)+'\');" href="#system"><title>'+system.name+'</title></use>';
+		systemSVG += ' class="system '+nameEsc(governmentName)+'-system '+sysStatus+'" x="'+(2048 + system.position.x)+'" y="'+(2048 + system.position.y)+'" onclick="showSystem(\''+nameEsc(systemName)+'\');" href="#system"><title>'+system.name+'</title></use>';
 		
 		var nameLen = systemName.length;
 		var xOffset = 0;
@@ -119,6 +127,7 @@ $(function() {
 		}
 		systemNameSVG += '" x="'+(2048 + system.position.x - xOffset)+'" y="'+(2048 + system.position.y + yOffset)+'" onclick="showSystem(\''+nameEsc(systemName)+'\');">'+systemName+'</text>';
 		
+		var displaySystem = showSystem;
 		var systemLinksSVG = '';
 		for (var i in system.links) {
 			var toName = system.links[i];
@@ -130,12 +139,23 @@ $(function() {
 			if (systemLinksSVG != '') {
 				systemLinksSVG += '\n';
 			}
+			if (!displaySystem && spoilerFreeGovernments.includes(toSystem.government)) {
+				displaySystem = true;
+			}
 			systemLinksSVG += '<line class="system-link" id="'+linkId+'-link" x1="'+(2048 + system.position.x)+'" y1="'+(2048 + system.position.y)+'" x2="'+(2048 + toSystem.position.x)+'" y2="'+(2048 + toSystem.position.y)+'"></line>';
 		}
 		
-		$("#systems").append(systemSVG);
-		$("#systemNames").append(systemNameSVG);
-		$("#systemLinks").append(systemLinksSVG);
+		if (displaySystem) {
+			$("#systems").append(systemSVG);
+			if (showSystem) {
+				$("#systemNames").append(systemNameSVG);
+				$("#systemLinks").append(systemLinksSVG);
+				
+				if (centerSystem == null || systemName == 'Rutilicus') {
+					centerSystem = system;
+				}
+			}
+		}
 	}
 	if (!spoilerFree) {
 		for (var wormholeName in wormholes) {
