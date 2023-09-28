@@ -102,6 +102,11 @@ class EsPregenJsCommand extends Command
 			$this->missionsJS();
 		}
 		
+		if (!$onlyMissing || !file_exists($this->jsFileLocation.'wormholes.js')) {
+			$io->write('Writing wormholes.js...'."\n");
+			$this->wormholesJS();
+		}
+		
         $io->success('JS files complete!');
 
         return Command::SUCCESS;
@@ -244,6 +249,18 @@ class EsPregenJsCommand extends Command
 			//$this->logger->debug('JSONifying '.$Mission->getTrueName());
 			$missionResponse = $this->twig->render('sky/data/mission.js.twig', ['mission'=>$Mission->toJSON(true)]);
 			file_put_contents($outFileName, $missionResponse, FILE_APPEND);
+		}
+	}
+	
+	public function wormholesJS(): void {
+		$wormholeQ = $this->em->createQuery('Select s from App\Entity\Sky\Wormhole s');
+		$iterableResult = $wormholeQ->toIterable();
+		$outFileName = $this->jsFileLocation.'wormholes.js';
+		file_put_contents($outFileName, '// Pregenerated wormhole data file'."\n".'var wormholes = {};'."\n");
+		foreach ($iterableResult as $Wormhole) {
+			//$this->logger->debug('JSONifying '.$Wormhole->getTrueName());
+			$wormholeResponse = $this->twig->render('sky/data/wormhole.js.twig', ['wormhole'=>$Wormhole->toJSON(true)]);
+			file_put_contents($outFileName, $wormholeResponse, FILE_APPEND);
 		}
 	}
 }

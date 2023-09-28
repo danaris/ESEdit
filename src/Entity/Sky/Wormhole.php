@@ -303,6 +303,7 @@ class Wormhole {
 		
 		$jsonArray['planet'] = $this->planet?->toJSON(true);
 		$jsonArray['name'] = $this->name;
+		$jsonArray['trueName'] = $this->trueName;
 		$jsonArray['mappable'] = $this->mappable;
 		$jsonArray['linkColor'] = $this->linkColor->toJSON(true);
 		
