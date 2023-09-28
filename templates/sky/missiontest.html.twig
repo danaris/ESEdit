@@ -29,7 +29,7 @@
 		</li>
 	{% endif %} #}
 	{% if mission.isUnlockedBy|length == 0 %}
-		{% include 'sky/mission.html.twig' %}
+		{% include 'sky/missionChain.html.twig' %}
 	{% endif %}
 {% endfor %}
 </ol>

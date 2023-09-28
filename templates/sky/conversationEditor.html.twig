@@ -1,0 +1,58 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Conversation Editor{% endblock %}
+
+{% block lateScripts %}
+<script>
+var conversation = null;
+function assignNewConversation(newConversation) {
+	conversation = newConversation;
+	conversation.addNode(null);
+}
+function assignConversation(newConversation) {
+	conversation = newConversation;
+}
+function getConversationSpec(event) {
+	var conversationName = 'New Conversation';
+	var convData = conversation.getData();
+	event.target.textContent = 'Loading...';
+	var width = Math.round(window.visualViewport.width * 0.75);
+	var height = Math.round(window.visualViewport.height * 0.75);
+	$.ajax({
+		type: "POST",
+		url: '{{ path('SkyConversationSpec') }}',
+		data: {conversation: convData},
+		success: function (data) {
+			if (data.error) {
+				// TODO: errors
+			} else {
+				event.target.textContent = 'Get Spec';
+				if ($("#convSpecDialog").length == 0) {
+					$("#content").append('<div id="convSpecDialog" class="specText" title="Conversation Spec"></div>');
+				}
+				$("#convSpecDialog").text(data);
+				$("#convSpecDialog").dialog({
+					  autoOpen: false,
+					  height: height,
+					  width: width,
+					  modal: true,
+					  close: function() {
+						  $("#convSpecDialog").dialog('close');
+					  }
+				  });
+				$("#convSpecDialog").dialog('open');
+			}
+		},
+		dataType: 'text'
+	});
+}
+</script>
+<script src="{{ asset('js/displayEdit.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div style="margin-top: 1em;"></div>
+<p>Once you have written a conversation here, you can click the "Get Spec" button to get a data-file specification for it that can be pasted into a plugin or the ES data files.</p>
+<button type="button" onclick="getConversationSpec(event);">Get Spec</button>
+{% include 'sky/conversation.html.twig' %}
+{% endblock %}

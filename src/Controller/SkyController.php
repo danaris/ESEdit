@@ -18,6 +18,7 @@ use App\Service\SkyService;
 use App\Entity\DataNode;
 use App\Entity\DataFile;
 use App\Entity\DataWriter;
+use App\Entity\Sky\Conversation;
 use App\Entity\Sky\Mission;
 use App\Entity\Sky\GameData;
 use App\Entity\Sky\Government;
@@ -374,14 +375,81 @@ class SkyController extends AbstractController {
 		return $this->render('sky/ship.html.twig', $data);
 	}
 	
-	#[Route('/sky/mission/{missionName}', name: 'SkyEditShip')]
+	#[Route('/sky/mission/{missionName}', name: 'SkyEditMission')]
 	public function mission(Request $request, string $missionName): Response {
 		$data = [];
 		$Mission = $this->em->getRepository(Mission::class)->findOneBy(['name'=>$missionName]);
 		$data['Mission'] = $Mission;
+		$data['tokenReplacements'] = ['<commodity>'=>'<span class="replaceableToken">&lt;commodity&gt;</span>','<tons>'=>'<span class="replaceableToken">&lt;tons&gt;</span>','<cargo>'=>'<span class="replaceableToken">&lt;cargo&gt;</span>','<bunks>'=>'<span class="replaceableToken">&lt;bunks&gt;</span>','<passengers>'=>'<span class="replaceableToken">&lt;passengers&gt;</span>','<fare>'=>'<span class="replaceableToken">&lt;fare&gt;</span>','<origin>'=>'<span class="replaceableToken">&lt;origin&gt;</span>','<planet>'=>'<span class="replaceableToken">&lt;planet&gt;</span>','<system>'=>'<span class="replaceableToken">&lt;system&gt;</span>','<destination>'=>'<span class="replaceableToken">&lt;destination&gt;</span>','<stopovers>'=>'<span class="replaceableToken">&lt;stopovers&gt;</span>','<planet stopovers>'=>'<span class="replaceableToken">&lt;planet stopovers&gt;</span>','<waypoints>'=>'<span class="replaceableToken">&lt;waypoints&gt;</span>','<payment>'=>'<span class="replaceableToken">&lt;payment&gt;</span>','<fine>'=>'<span class="replaceableToken">&lt;fine&gt;</span>','<date>'=>'<span class="replaceableToken">&lt;date&gt;</span>','<day>'=>'<span class="replaceableToken">&lt;day&gt;</span>','<npc>'=>'<span class="replaceableToken">&lt;npc&gt;</span>','<npc model>'=>'<span class="replaceableToken">&lt;npc model&gt;</span>','<first>'=>'<span class="replaceableToken">&lt;first&gt;</span>','<last>'=>'<span class="replaceableToken">&lt;last&gt;</span>','<ship>'=>'<span class="replaceableToken">&lt;ship&gt;</span>'];
 		
 		$data['source'] = ['name'=>$Mission->getSourceName(),'file'=>$Mission->getSourceFile(),'version'=>$Mission->getSourceVersion()];
 		return $this->render('sky/mission.html.twig', $data);
+	}
+	
+	#[Route('/sky/conversationSpec', name: 'SkyConversationSpec')]
+	public function conversationSpec(Request $request): Response {
+		if (!$request->request->has('conversation')) {
+			$this->addFlash('error','No conversation specified for writing!');
+			return new RedirectResponse($this->generateUrl('SkyEditHome'));
+		}
+		
+		$conversationJSON = $request->request->all()['conversation'];
+		
+		$Conversation = new Conversation();
+		$Conversation->setFromJSON($conversationJSON);
+		$stringWriter = new DataWriter('');
+		$Conversation->save($stringWriter);
+		
+		$response = new Response($stringWriter->getString());
+		$response->headers->set('Content-Type','text/plain');
+		
+		return $response;
+	}
+	
+	#[Route('/sky/newConversation', name: 'SkyNewConversation')]
+	public function newConversation(Request $request): Response {
+		$Conversation = new Conversation();
+		$Conversation->setId(-1);
+		$Conversation->setSourceName('web');
+		$Conversation->setSourceFile('(n/a)');
+		$Conversation->setSourceVersion('new');
+		
+		$data = ['conversation'=>$Conversation];
+		$data['conversationCallback'] = 'assignNewConversation';
+		
+		return $this->render('sky/conversationEditor.html.twig', $data);
+	}
+	
+	#[Route('/sky/loadConversationForm', name: 'SkyLoadConversationForm')]
+	public function loadConversationForm(Request $request): Response {
+		return $this->render('sky/conversationLoadForm.html.twig');
+	}
+	
+	#[Route('/sky/loadConversation', name: 'SkyLoadConversation')]
+	public function loadConversation(Request $request): Response {
+		$this->logger->debug('loadConversation() start');
+		if (!$request->request->has('conversation')) {
+			$this->addFlash('error','No conversation specified for writing!');
+			return new RedirectResponse($this->generateUrl('SkyEditHome'));
+		}
+		$this->logger->debug('loadConversation() creating data file');
+		$sourceInfo = ['name'=>'web','file'=>'(n/a)','version'=>'new','dir'=>''];
+		$DataFile = new DataFile($sourceInfo, false);
+		$this->logger->debug('loadConversation() loading from string');
+		$DataFile->loadFromString($request->request->get('conversation'));
+		
+		$this->logger->debug('loadConversation() creating conversation');
+		$Conversation = new Conversation();
+		$this->logger->debug('loadConversation() loading from data');
+		$convNode = $DataFile->getRoot()->getChildren()[0];
+		$Conversation->load($convNode);
+		$Conversation->setId(-1);
+		
+		$this->logger->debug('loadConversation() rendering');
+		$data = ['conversation'=>$Conversation];
+		$data['conversationCallback'] = 'assignConversation';
+		
+		return $this->render('sky/conversationEditor.html.twig', $data);
 	}
 	
 	#[Route('/sky/writeShip', name: 'SkyEditWriteShip')]

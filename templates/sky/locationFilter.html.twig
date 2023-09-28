@@ -1,0 +1,71 @@
+{% if filter.isEmpty %}
+(everywhere)
+{% else %}
+	<ul>
+	{% if filter.shipCategory|length == 0 %}
+		{% if filter.planets|length > 0 %}
+			<li>The following planets:<ul>
+				{% for planet in filter.planets %}
+				<li>{{ planet.name }}</li>
+				{% endfor %}
+			</ul></li>
+		{% endif %}
+		{% if filter.systems|length > 0 %}
+			<li>Planets in the following systems:<ul>
+				{% for system in filter.systems %}
+				<li>{{ system.name }}</li>
+				{% endfor %}
+			</ul></li>
+		{% endif %}
+		{% if filter.governments|length > 0 %}
+			<li>Planets with the following governments:<ul>
+				{% for gov in filter.governments %}
+				<li>{{ gov.trueName }}</li>
+				{% endfor %}
+			</ul></li>
+		{% endif %}
+		{% if filter.attributes|length > 0 %}
+			<li>Planets with the following attributes (at least one in each set):
+				<ul>
+				{% for attributeSet in filter.attributes %}
+					<li>{{ attributeSet|join(', ') }}</li>
+				{% endfor %}
+				</ul></li>
+		{% endif %}
+		{% if filter.center %}
+			<li>Planets in systems {% if filter.centerMinDistance %}at least {{ filter.centerMinDistance }} jump(s){% if filter.centerMaxDistance %} and{% endif %}{% endif %} at most {{ filter.centerMaxDistance }} jump(s) from {{ filter.center.name }}
+				<ul>
+					<li>Using {{ filter.originDistanceOptions.wormholeStrat.value }}</li>
+					<li>Assuming {% if not filter.originDistanceOptions.assumesJumpDrive %}no {% endif %}jump drive</li>
+				</ul>
+			</li>
+		{% endif %}
+		{% if filter.notFilters|length > 0 %}
+			<li>Locations <b>not</b> matching the following criteria:<ul>
+				{% for notFilter in filter.notFilters %}
+					{% set tmp = filter %}
+					{% set filter = notFilter %}
+					{% include 'sky/locationFilter.html.twig' %}
+					{% set filter = tmp %}
+				{% endfor %}
+			</ul></li>
+		{% endif %}
+		{% if filter.neighborFilters|length > 0 %}
+			<li>Locations <b>neighboring</b> those matching the following criteria:<ul>
+				{% for neighborFilter in filter.neighborFilters %}
+					{% set tmp = filter %}
+					{% set filter = neighborFilter %}
+					{% include 'sky/locationFilter.html.twig' %}
+					{% set filter = tmp %}
+				{% endfor %}
+			</ul></li>
+		{% endif %}
+	{% else %}
+		<li>Ships in the following categories:<ul>
+			{% for category in filter.shipCategories %}
+			<li>{{ category }}</li>
+			{% endfor %}
+		</ul></li>
+	{% endif %}
+	</ul>
+{% endif %}

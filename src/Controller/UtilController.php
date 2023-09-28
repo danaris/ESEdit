@@ -21,7 +21,11 @@ class UtilController extends AbstractController {
 	
 	protected $outfitFile = array();
 	protected $outfitHeaders = array();
-	protected $dataDir = "/Users/tcollett/Applications/Endless Sky.app/Contents/Resources/data";
+	protected $dataDir = '';
+	
+	public function __construct() {
+		$this->dataDir = $_ENV['DATA_PATH'].'data';
+	}
 	
 	#[Route("/util/endlessOutfits", name: "EndlessOutfits")]
 	public function endlessOutfits(Request $request): Response {

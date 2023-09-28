@@ -1,0 +1,11 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Load Conversation{% endblock %}
+
+{% block content %}
+<p>Paste the conversation specification into the box and click "Load".</p>
+<form action="{{ path('SkyLoadConversation') }}" method="POST">
+	<textarea name="conversation" style="width: 100%; max-height: 95%;" rows="15"></textarea>
+	<input type="submit" name="action" value="Load">
+</form>
+{% endblock %}

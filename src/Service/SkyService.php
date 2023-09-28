@@ -46,6 +46,8 @@ class SkyService {
 	
 	protected bool $debug = false;
 	
+	private bool $loaded = false;
+	
 	public function __construct(protected LoggerInterface $logger,
 								protected SerializerInterface $serializer,
 								protected EntityManagerInterface $em,
@@ -82,6 +84,10 @@ class SkyService {
 	}
 	
 	public function loadUniverseFromFiles($checkCache = true, $loadImages = true) {
+		if ($this->loaded) {
+			$this->logger->debug('LUFF already loaded, skipping');
+			return;
+		}
 		// This should be a reliable method to tell if we've at least got something loaded
 		$this->logger->debug('LUFF checking player government');
 		$MyGov = GameData::PlayerGovernment();
@@ -97,7 +103,7 @@ class SkyService {
 			}
 			$this->truncateTables(['Body', 'Color', 'ConditionSet', 'Conversation', 'ConversationElement', 'ConversationNode', 'Effect', 'EventTrigger', 'Expression', 'FlareSound', 'FlareSprite', 'GameAction', 'GameEvent', 'Government', 'GovernmentPenalty', 'JumpSound', 'LocationFilter', 'Mission', 'MissionAction', 'NPC', 'Outfit', 'OutfitAttributes', 'OutfitEffect', 'OutfitPenalty', 'Phrase', 'Planet', 'Ship', 'Sound', 'Sprite', 'SubExpression', 'System', 'SystemLink', 'TextReplacements', 'Wormhole', 'WormholeLink', 'locationfilter_government', 'locationfilter_system']);
 			if (!$loaded) {
-				$sources = [['name'=>'vanilla','dir'=>$_ENV['DATA_PATH'],'version'=>'0.10.3a (3870808f)']];
+				$sources = [['name'=>'vanilla','dir'=>$_ENV['DATA_PATH'],'version'=>'0.10.3b (c6d74ba3)']];
 				GameData::SetSources($sources);
 				//$this->loadImageDB();		
 				$images = GameData::FindImages();
@@ -126,6 +132,7 @@ class SkyService {
 			$this->em->flush();
 		}
 		$this->logger->debug('LUFF done');
+		$this->loaded = true;
 	}
 	
 	public function getImages() {

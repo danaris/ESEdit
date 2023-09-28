@@ -1,0 +1,121 @@
+<div class="missionActionType">
+	On {{ actionTrigger|capitalize }}:
+</div>
+{% set actionEmpty = true %}
+{% if action.conversation %}
+	{% set actionEmpty = false %}
+<div class="missionActionConversation">
+	Conversation: <button type="button" onclick="getConversationSpec(event, '{{ actionTrigger }}');">Get Spec</button><br>
+	{# {% for nodeIndex, node in action.conversation.nodes %}
+		{% set myLabel = action.conversation.getLabelForIndex(nodeIndex) %}
+		<div class="conversationNode">
+			<div class="conversationNodeLabel">
+				{% if myLabel %}
+				Label {{ myLabel }}<br>
+				{% endif %}
+				Node #{{ nodeIndex }}
+				{% if node.isChoice %}
+				<br>Choice
+				{% endif %}
+				{% if node.branchName %}
+				<br>Branch {{ node.branchName }}
+				{% endif %}
+			</div>
+			<div class="conversationNodeConditions">
+				Display this node: 
+				{% if node.conditions %}
+					{% set condition = node.conditions %}
+					{% set setId = Mission.name ~ '-' ~ action.trigger ~ '-' ~ nodeIndex %}
+					{% set conditionSetLabel = setId %}
+					{% set isChild = false %}
+					{% include 'sky/conditionSet.html.twig' %}
+				{% endif %}
+			</div>
+			<div class="conversationNodeElements">
+				{% for elementIndex, element in node.elements %}
+				<div class="conversationNodeElement">
+					<div class="conversationElementConditions">
+						Display this element: 
+						{% if element.conditions %}
+							{% set condition = element.conditions %}
+							{% set setId = Mission.name ~ '-' ~ action.trigger ~ '-' ~ nodeIndex ~ '-' ~ elementIndex %}
+							{% set conditionSetLabel = setId %}
+							{% set isChild = false %}
+							{% include 'sky/conditionSet.html.twig' %}
+						{% endif %}
+					</div>
+					<div class="conversationElementText">
+					{% if node.isChoice %}Choice: {% endif %}{{ element.text }}
+					</div>
+					<div class="conversationElementNext">
+						{% if element.next > 0 %}
+							{% set gotoLabel = action.conversation.getLabelForIndex(element.next) %}
+								{% if gotoLabel %}
+						Goto {{ gotoLabel }}<br>
+								{% endif %}
+						Next: node #{{ element.next }}
+						{% endif %}
+					</div>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+	{% endfor %} #}
+	{% set conversation = action.conversation %}
+	{% set conversationCallback = 'conversationReady' %}
+	{% include 'sky/conversation.html.twig' %}
+</div>
+<script>
+var conversations = [];
+var conversationsByName = {};
+function conversationReady(conversation) {
+	conversations.push(conversation);
+	conversationsByName[conversation.name] = conversation;
+}
+function getConversationSpec(event, trigger) {
+	var missionName = '{{ Mission.name }}';
+	var conversationName = missionName + '-' + trigger;
+	var conversation = conversationsByName[conversationName];
+	var convData = conversation.getData();
+	event.target.textContent = 'Loading...';
+	var width = Math.round(window.visualViewport.width * 0.75);
+	var height = Math.round(window.visualViewport.height * 0.75);
+	$.ajax({
+		type: "POST",
+		url: '{{ path('SkyConversationSpec') }}',
+		data: {conversation: convData},
+		success: function (data) {
+			if (data.error) {
+				// TODO: errors
+			} else {
+				event.target.textContent = 'Get Spec';
+				if ($("#convSpecDialog").length == 0) {
+					$("#content").append('<div id="convSpecDialog" class="specText" title="Conversation Spec"></div>');
+				}
+				$("#convSpecDialog").text(data);
+				$("#convSpecDialog").dialog({
+					  autoOpen: false,
+					  height: height,
+					  width: width,
+					  modal: true,
+					  close: function() {
+						  $("#convSpecDialog").dialog('close');
+					  }
+				  });
+				$("#convSpecDialog").dialog('open');
+			}
+		},
+		dataType: 'text'
+	});
+}
+</script>
+{% endif %}
+{% if action.dialogText %}
+	{% set actionEmpty = false %}
+<div class="missionActionDialog">
+	<display-edit-textarea rows="5" cols="50" field-name="{{ Mission.name ~ '-' ~ actionTrigger }}-dialog" field-label="Dialog: "><text>{{ action.dialogText }}</text></display-edit-textarea>
+</div>
+{% endif %}
+{% if actionEmpty %}
+<div>No actions</div>
+{% endif %}

@@ -1,0 +1,50 @@
+{# <div class="conditionSet">
+{% if condsetDefault is not defined %}
+	{% set condsetDefault = 'always' %}
+{% endif %}
+{% if condition.expressions|length == 0 and condition.children|length == 0 %}
+{{ condsetDefault }}
+{% else %}
+	{% if condition.isOr %}
+		<p>If any of the following are true:</p>
+	{% endif %}
+	<ul>
+	{% for expression in condition.expressions %}
+		<li>{{ expression.left }} {{ expression.op }} {{ expression.right }}</li>
+	{% endfor %}
+	</ul>
+	<ul>
+		{% for child in condition.children %}
+			{% set tmp = condition %}
+			{% set condition = child %}
+			{% include 'sky/conditionSet.html.twig' %}
+			{% set condition = tmp %}
+		{% endfor %}
+	</ul>
+{% endif %}
+	<img src="{{ asset('images/pencil-gray-16.png') }}" style="width: 16px; height: 16px;">
+</div> #}
+<display-edit-condition-set setId="{{ setId }}" label="{{ conditionSetLabel }}"{% if condition.isOr %} or{% endif %}{% if isChild %} type="child"{% endif %}>
+	{% for expression in condition.expressions %}
+	
+	<condition type="expressions" left="{{ expression.left }}" op="{{ expression.op }}" right="{{ expression.right }}"></condition>
+		
+	{% endfor %}
+	{% for index, child in condition.children %}
+	
+		{% set tmp = condition %}
+		{% set tmpId = setId %}
+		{% set tmpLabel = conditionSetLabel %}
+		{% set tmpChild = isChild %}
+		{% set condition = child %}
+		{% set setId = setId ~ '_child' ~ index %}
+		{% set conditionSetLabel = conditionSetLabel ~ '_child' ~ index %}
+		{% set isChild = true %}
+		{% include 'sky/conditionSet.html.twig' %}
+		{% set condition = tmp %}
+		{% set setId = tmpId %}
+		{% set conditionSetLabel = tmpLabel %}
+		{% set isChild = tmpChild %}
+		
+	{% endfor %}
+</display-edit-condition-set>

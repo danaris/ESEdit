@@ -1,60 +1,112 @@
-<div class="missionChain">
-	<div class="missionCard" id="{{ mission.identifier|cssNameEsc }}">
-		<div class="missionNameContainer">{% if not mission.isVisible %}<img src="{{ asset("images/sight-disabled-64.png") }}" style="width: 32px; height: 32px;">{% endif %} <span class="missionName" id="{{ mission.identifier|cssNameEsc }}-name">{{ mission.identifier }}</span>{% if mission.name and mission.name != mission.identifier %} <span class="missionDisplayName">{{ mission.name }}</span>{% endif %}</div>
-		{% if mission.description %}<div class="missionDescription">{{ mission.description }}</div>{% endif %}
-		<div class="missionDebug">
-			<p>Unlocked by: {{ mission.isUnlockedBy|length }}</p>
-			<p>Blocked by: {{ mission.isBlockedBy|length }}</p>
-			<p>Unlocks: {{ mission.unlocksOn|length }}</p>
-			<p>Blocks: {{ mission.blocksOn|length }}</p>
-			<p>Triggers: {{ mission.triggersEventsOn|length }}</p>
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}{{ Mission.trueName }} ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<style>
+#missionContainer {
+	margin-top: 1rem;
+}
+.fieldContainer {
+	display: grid;
+	grid-template-columns: 12em auto;
+}
+.fieldContainer > div > p, .fieldContainer > div > ul {
+	margin-top: 0px;
+}
+</style>
+{% endblock %}
+{% block lateScripts %}
+<script src="{{ asset('js/displayEdit.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<script>
+var tgcTest = 'Testing! <3';
+$(function() {
+
+});
+</script>
+<div id="missionContainer">
+	<display-edit-text style="width: 40rem;" field-name="missionName" field-label="Mission Name:" field-value="{{ Mission.trueName }}"></display-edit-text>
+	<display-edit-text style="width: 40rem;" field-name="missionDisplayName" field-label="Mission Display Name:" field-value="{{ Mission.name }}">{% for token, replacement in tokenReplacements %}
+		<replace search="{{ token }}" replace="{{ replacement }}"></replace>
+		{% endfor %}</display-edit-text>
+	<display-edit-textarea rows="5" cols="50" field-name="missionDescription" field-label="Mission Description:">
+		<text>{{ Mission.description }}</text>
+		{% for token, replacement in tokenReplacements %}
+		<replace search="{{ token }}" replace="{{ replacement }}"></replace>
+		{% endfor %}
+	</display-edit-textarea>
+	<display-edit-select field-name="missionLocation" style="width: 7em;" field-label="Mission Offered At:" field-value="{{ Mission.location }}">
+		<option>spaceport</option>
+		<option>landing</option>
+		<option>job</option>
+		<option>assisting</option>
+		<option>boarding</option>
+		<option>shipyard</option>
+		<option>outfitter</option>
+	</display-edit-select>
+	<div class="fieldContainer">
+		<div>Source:</div>
+		<div>
+			{% if Mission.source %}
+				<p>{{ Mission.source.name }}</p>
+			{% else %}
+				{% set filter = Mission.sourceFilter %}
+				{% include 'sky/locationFilter.html.twig' %}
+			{% endif %}
 		</div>
-		{% if mission.isUnlockedBy|length > 0 %}
-		<div class="missionPrereqs">
-			Unlocked by:
-			{% for prereqName, prereqInfo in mission.isUnlockedBy %}
-			<p>{% if prereqInfo['type'] == 'mission' %}Mission {{ prereqName }} is {{ prereqInfo['on'] }}
-				{% elseif prereqInfo['type'] == 'event' %}Event {{ prereqName }}{% if prereqInfo['on'] is defined %}{{ prereqInfo['on'] }}{% else %} has occurred{% endif %}
-				{% elseif prereqInfo['type'] == 'attribute' %}Player has attribute {{ prereqName }}{% if prereqInfo['on'] is defined %}{{ prereqInfo['on'] }}{% endif %}
-				{% endif %}</p>
-			{% endfor %}
+	</div>
+	<div class="fieldContainer">
+		<div>Destination:</div>
+		<div>
+			{% if Mission.destination %}
+				<p>{{ Mission.destination.name }}</p>
+			{% elseif not Mission.destinationFilter.isEmpty() %}
+				{% set filter = Mission.destinationFilter %}
+				{% include 'sky/locationFilter.html.twig' %}
+			{% else %}
+				(Source Planet)
+			{% endif %}
 		</div>
-		{% endif %}
-		{% if mission.unlocksOn|length > 0 %}
-		<div class="missionUnlocks">
-			Unlocks:
-			{% for unlockName, unlockInfo in mission.unlocksOn %}
-			<p>{% if unlockInfo['type'] == 'mission' %}Mission <span class="missionName">{{ unlockName }}</span> on {{ unlockInfo['on'] }}{% endif %}</p>
-			{% endfor %}
-		</div>
-		{% endif %}
-		{% if mission.triggersEventsOn|length > 0 %}
-		<div class="missionEvents">
-			Triggers:
-			{% for trigger, events in mission.triggersEventsOn %}
-				{% for eventInfo in events %}
-			<p>Event <span class="eventName">{{ eventInfo['name'] }}</span> {% if eventInfo['minDays'] == 0 and eventInfo['maxDays'] == 0 %}on{% elseif eventInfo['maxDays'] != 0 %}up to {{ eventInfo['maxDays'] }} day(s) after{% elseif eventInfo['minDays'] == eventInfo['maxDays'] %}{{ eventInfo['minDays'] }} after{% else %}from {{ eventInfo['minDays'] }} to {{ eventInfo['maxDays'] }} after{% endif %} {{ trigger }}</p>
-				{% endfor %}
-			{% endfor %}
-		</div>
-		{% endif %}
-		
-		<div class="missionDefinitionOuter">
-			<div class="missionDefinitionHeader">[+] Definition</div>
-			<div class="missionDefinition">
-				{{ writeObject(mission)|replace({"\n": "<br>","	": " &nbsp; &nbsp;"})|raw }}
+	</div>
+	<div class="fieldContainer">
+		<label for="missionMinor">Minor:</label><input type="checkbox" name="missionMinor" value="true"{% if Mission.minor %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionAutosave">Autosave:</label><input type="checkbox" name="missionAutosave" value="true"{% if Mission.autosave %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionOverridesCapture">Overrides Capture:</label><input type="checkbox" name="missionOverridesCapture" value="true"{% if Mission.overridesCapture %} checked{% endif %}>
+	</div>
+	<display-edit-text style="width: 20rem;" field-name="missionDeadlineBase" field-label="Mission Deadline Base:" field-value="{{ Mission.deadlineBase }}"></display-edit-text>
+	<display-edit-text style="width: 20rem;" field-name="missionDeadlineMultiplier" field-label="Mission Deadline Multiplier:" field-value="{{ Mission.deadlineMultiplier }}"></display-edit-text>
+	<div class="fieldContainer">
+		<label for="missionClearance">Clearance:</label><input type="checkbox" name="missionClearance" value="true"{% if Mission.clearance %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionIgnoreClearance">Ignore Clearance:</label><input type="checkbox" name="missionIgnoreClearance" value="true"{% if Mission.ignoreClearance %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionInfiltrating">Infiltrating:</label><input type="checkbox" name="missionInfiltrating" value="true"{% if not Mission.hasFullClearance %} checked{% endif %}>
+	</div>
+	<display-edit-text style="width: 20rem;" field-name="missionRepeat" field-label="Repeat:" field-value="{{ Mission.repeat }}"></display-edit-text>
+	{% set conditions = {'Offer': Mission.toOffer, 'Accept': Mission.toAccept, 'Complete': Mission.toComplete, 'Fail': Mission.toFail} %}
+	{% for condName, condition in conditions %}
+		<div class="fieldContainer">
+			<div>To {{ condName }}:</div>
+			<div>
+				{% set setId = Mission.trueName ~ '-to' ~ condName %}
+				{% set conditionSetLabel = setId %}
+				{% set isChild = false %}
+				{% include 'sky/conditionSet.html.twig' %}
 			</div>
 		</div>
+	{% endfor %}
+	{% for actionTrigger, action in Mission.actions %}
+	<div class="fieldContainer">
+		{% include 'sky/missionAction.html.twig' %}
 	</div>
-	<div class="unlockedMissionsOuter">
-		{% if mission.unlocksOn|length > 0 %}
-		<div class="unlockedMissionsHeader">[+] Unlocked Missions</div>
-		<div class="unlockedMissions">
-			{% for unlockName, unlockInfo in mission.unlocksOn %}
-				{% set mission = unlockInfo['mission'] %}
-				{% include 'sky/mission.html.twig' %}
-			{% endfor %}
-		</div>
-		{% endif %}
-	</div>
+	{% endfor %}
 </div>
+{% endblock %}
