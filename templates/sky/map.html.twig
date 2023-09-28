@@ -95,6 +95,7 @@ function angleBetween(fromPoint, toPoint) {
 	return angleDeg;
 }
 var spoilerFreeGovernments = ['Republic','Syndicate','Pirate','Free Worlds'];
+var centerSystem = null;
 $(function() {
 	for (var systemName in systems) {
 		var showSystem = true;
@@ -211,6 +212,9 @@ $(function() {
 	// 	$("#galaxyMap").append(galaxySVG);
 	// }
 	$("#galaxySvg").html($("#galaxySvg").html());
+	var centerX = 2048 + centerSystem.position.x - window.visualViewport.width/2;
+	var centerY = 2048 + centerSystem.position.y - window.visualViewport.height/2;
+	window.scrollTo(centerX, centerY);
 });
 </script>
 <svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 4096 4096" id="galaxySvg">
