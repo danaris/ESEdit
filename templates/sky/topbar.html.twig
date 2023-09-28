@@ -1,75 +1,3 @@
-{# {% set skyPlugins = skyPlugins() %}
-<script>
-function clearDataCache() {
-	$.ajax({
-			type: "GET",
-			url: '{{ path('SkyClearDataCache') }}',
-			data: {},
-			success: function (data) {
-				if (data.error) {
-					// TODO: errors
-				} else {
-					console.log('Cleared data cache');
-				}
-			},
-			dataType: 'json'
-		});
-}
-function clearImageCache() {
-	$.ajax({
-			type: "GET",
-			url: '{{ path('SkyClearImageCache') }}',
-			data: {},
-			success: function (data) {
-				if (data.error) {
-					// TODO: errors
-				} else {
-					console.log('Cleared image cache');
-				}
-			},
-			dataType: 'json'
-		});
-}
-$(function() {
-	$("#skyAddPluginDialog").dialog({
-		  autoOpen: false,
-		  height: 350,
-		  width: 550,
-		  modal: true,
-		  close: function() {
-			  $("#skyAddPluginDialog").dialog('close');
-		  },
-		  buttons: [{
-			  text: "Add",
-			  click: function() {
-				  var pluginName = $("#skyPluginName").val();
-				  var pluginPath = $("#skyPluginPath").val();
-				  $.ajax({
-					  type: "POST",
-					  url: '{{ path('SkyAddPlugin') }}',
-					  data: {pluginName: pluginName, pluginPath: pluginPath},
-					  success: function (data) {
-						  if (data.error) {
-							  // TODO: errors
-						  } else {
-							  var firstChild = $("#skyPluginNames").children()[0];
-							  if (firstChild.innerHTML == 'add a plugin') {
-							  	$("#skyPluginNames").html('');
-							  }
-							  $("#skyPluginNames").append('<option>'+pluginName+'</option>');
-							  $(this).dialog("close");
-						  }
-					  },
-					  dataType: 'json'
-				  });
-			  }
-		  }]
-		});
-});
-function addPlugin() {
-	$("#skyAddPluginDialog").dialog("open");
-}
-</script>#}
 <script>
 var spoilerFree = Cookies.get('spoilerFree') == undefined ? true : Cookies.get('spoilerFree') == 'true';
 function toggleSpoilers() {
@@ -88,6 +16,9 @@ $(function () {
 });
 </script>
 <div id="skyTop">
+	<div id="patreonLink">
+		<a href="https://www.patreon.com/delvin_anaris" target="_blank" title="Support the creator on Patreon!"><img src="{{ asset("images/Digital-Patreon-Logo_FieryCoral.png") }}" style="width: 16px; height: 16px;"></a>
+	</div>
 	<div>
 		{% if source is defined %}
 		Source: <span id="sourceFile">{{ source['file'] }}</span> (<span id="sourceName">{{ source['name'] }}</span> <span id="sourceVersion">{{ source['version'] }})</span>
