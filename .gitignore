@@ -19,3 +19,7 @@
 /WIP/Version*
 composer.lock
 public/sky/data
+
+###> symfony/asset-mapper ###
+/public/assets/
+###< symfony/asset-mapper ###

@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Basic Conversation Editor ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<style>
+#convSplit {
+	display: grid;
+	grid-template-columns: 50% 50%;
+	height: 100%;
+}
+#data {
+	font-family: Monaco, fixed;
+	width: 100%;
+	height: 100%;
+	background-color: var(--dimmer);
+	color: var(--bright);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<script src="{{ asset('js/displayEdit.js') }}"></script>
+<script src="{{ asset('js/conversation.js') }}"></script>
+
+<div id="convSplit">
+	<conversation-edit id="conversation"></conversation-edit>
+	<textarea id="data" readonly></textarea>
+</div>
+<script>
+var conversation = document.getElementById('conversation');
+var data = document.getElementById('data');
+conversation.changeCallback = function (event) { data.textContent = conversation.toData(); };
+</script>
+
+{% endblock %}
