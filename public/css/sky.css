@@ -77,11 +77,11 @@ a:link:visited, a:visited {
 	padding: 0;
 	background: var(--dark);
 	z-index: 9;
-	position: fixed;
+	/* position: fixed; */
 	top: 0px;
 	left: 0px;
 	display: grid;
-	grid-template-columns: 28px auto auto auto;
+	grid-template-columns: 28px auto auto auto auto;
 }
 #patreonLink {
 	display: flex;
