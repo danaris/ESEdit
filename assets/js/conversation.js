@@ -49,6 +49,9 @@ class ConversationElement extends HTMLElement {
 	margin-top: 0.25rem;
 	margin-bottom: 0.25rem;
 	text-indent: 4rem;
+}
+.textNodeOptions {
+	margin-bottom: 0.5rem;
 }`;
 
 		this.shadow.appendChild(this.styleElement);
@@ -280,10 +283,18 @@ class ConversationElement extends HTMLElement {
 					}
 					break;
 				case 'label':
-					nodeText = 'label ' + node.labelElement.value;
+					var labelValue = node.labelElement.value;
+					if (labelValue.includes(' ')) {
+						labelValue = '"' + labelValue + '"';
+					}
+					nodeText = 'label ' + labelValue;
 					break;
 				case 'scene':
-					nodeText = 'scene ' + node.sceneElement.value;
+					var sceneValue = node.sceneElement.value;
+					if (sceneValue.includes(' ')) {
+						sceneValue = '"' + sceneValue + '"';
+					}
+					nodeText = 'scene ' + sceneValue;
 					break;
 				case 'name':
 					nodeText = 'name';
@@ -437,6 +448,7 @@ class ConversationTextNode extends HTMLElement {
 
 		
 		this.childElements = document.createElement('details');
+		this.childElements.classList.add('textNodeOptions');
 		this.childElementsTitle = document.createElement('summary');
 		this.childElementsTitle.textContent = 'Options';
 		this.childElements.appendChild(this.childElementsTitle);
@@ -523,7 +535,11 @@ class ConversationTextNode extends HTMLElement {
 		var dataText = baseIndentTabs + '`' + this.getValue() + '`';
 		if (this.goto) {
 			dataText += "\n";
-			dataText += baseIndentTabs + '	goto ' + this.goto;
+			var gotoValue = this.goto;
+			if (gotoValue.includes(' ')) {
+				gotoValue = '"' + gotoValue + '"';
+			}
+			dataText += baseIndentTabs + '	goto ' + gotoValue;
 		}
 		if (this.toDisplay) {
 			dataText += "\n";
