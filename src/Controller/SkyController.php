@@ -31,31 +31,31 @@ use App\Entity\Sky\Ship;
 use App\Entity\Sky\Sprite;
 
 class SkyController extends AbstractController {
-	
+
 	public function __construct(protected LoggerInterface $logger,
 								protected SkyService $skyService,
 								protected EntityManagerInterface $em) {
-		$skyService->loadUniverseFromFiles();
+
 	}
-	
+
 	private function loadSkyData() {
-		
+		$this->skyService->loadUniverseFromFiles();
 		$this->skyService->loadImageDB();
-		
+
 		$this->skyService->importData();
-		
+
 		$this->skyService->saveConfig();
-		
+
 	}
-	
+
 	#[Route('/sky', name: 'SkyEditHome')]
 	#[Route('/', name: 'SkyHome')]
 	public function index(): Response {
 		$data = [];
-		
+
 		return $this->render('sky/index.html.twig', $data);
 	}
-	
+
 	// #[Route('/skyImage/{imagePath}', name: 'SkyImagePath', requirements: ['imagePath' => '.+'])]
 	// public function image(Request $request, $imagePath): Response {
 	// 	if (substr($imagePath, 0, 6) == '/Users') {
@@ -338,74 +338,90 @@ class SkyController extends AbstractController {
 		foreach ($shipQ->getResult() as $Ship) {
 			$ships[$Ship->getId()] = $Ship->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/ships.js.twig', ['ships'=>$ships]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/map', name: 'SkyEditMap')]
 	public function map(Request $request): Response {
 		$data = [];
-		
+
 		$galQ = $this->em->createQuery('Select g from App\Entity\Sky\Galaxy g index by g.name');
 		$data['galaxies'] = $galQ->getResult();
-		
+
 		return $this->render('sky/map.html.twig', $data);
 	}
-	
+
 	#[Route('/sky/ships', name: 'SkyEditShips')]
 	public function ships(Request $request): Response {
 		return $this->render('sky/ships.html.twig');
 	}
-	
+
+	#[Route('/sky/swizzleTest', name: 'SkySwizzleTest')]
+	public function swizzleTest(Request $request): Response {
+		return $this->render('sky/swizzleBuilder.html.twig');
+	}
+
 	#[Route('/sky/ship/{shipId}', name: 'SkyEditShip')]
 	public function ship(Request $request, int $shipId): Response {
 		$data = [];
 		$Ship = $this->em->getRepository(Ship::class)->find($shipId);
 		$data['Ship'] = $Ship;
-		
+
 		$data['source'] = ['name'=>$Ship->getSourceName(),'file'=>$Ship->getSourceFile(),'version'=>$Ship->getSourceVersion()];
 		return $this->render('sky/ship.html.twig', $data);
 	}
-	
+
 	#[Route('/sky/mission/{missionName}', name: 'SkyEditMission')]
 	public function mission(Request $request, string $missionName): Response {
 		$data = [];
 		$Mission = $this->em->getRepository(Mission::class)->findOneBy(['name'=>$missionName]);
 		$data['Mission'] = $Mission;
 		$data['tokenReplacements'] = ['<commodity>'=>'<span class="replaceableToken">&lt;commodity&gt;</span>','<tons>'=>'<span class="replaceableToken">&lt;tons&gt;</span>','<cargo>'=>'<span class="replaceableToken">&lt;cargo&gt;</span>','<bunks>'=>'<span class="replaceableToken">&lt;bunks&gt;</span>','<passengers>'=>'<span class="replaceableToken">&lt;passengers&gt;</span>','<fare>'=>'<span class="replaceableToken">&lt;fare&gt;</span>','<origin>'=>'<span class="replaceableToken">&lt;origin&gt;</span>','<planet>'=>'<span class="replaceableToken">&lt;planet&gt;</span>','<system>'=>'<span class="replaceableToken">&lt;system&gt;</span>','<destination>'=>'<span class="replaceableToken">&lt;destination&gt;</span>','<stopovers>'=>'<span class="replaceableToken">&lt;stopovers&gt;</span>','<planet stopovers>'=>'<span class="replaceableToken">&lt;planet stopovers&gt;</span>','<waypoints>'=>'<span class="replaceableToken">&lt;waypoints&gt;</span>','<payment>'=>'<span class="replaceableToken">&lt;payment&gt;</span>','<fine>'=>'<span class="replaceableToken">&lt;fine&gt;</span>','<date>'=>'<span class="replaceableToken">&lt;date&gt;</span>','<day>'=>'<span class="replaceableToken">&lt;day&gt;</span>','<npc>'=>'<span class="replaceableToken">&lt;npc&gt;</span>','<npc model>'=>'<span class="replaceableToken">&lt;npc model&gt;</span>','<first>'=>'<span class="replaceableToken">&lt;first&gt;</span>','<last>'=>'<span class="replaceableToken">&lt;last&gt;</span>','<ship>'=>'<span class="replaceableToken">&lt;ship&gt;</span>'];
-		
+
 		$data['source'] = ['name'=>$Mission->getSourceName(),'file'=>$Mission->getSourceFile(),'version'=>$Mission->getSourceVersion()];
-		return $this->render('sky/mission.html.twig', $data);
+		return $this->render('sky/missionEditor.html.twig', $data);
 	}
-	
+
+	#[Route('/sky/newMission', name: 'SkyEditNewMission')]
+	public function newMission(Request $request): Response {
+		$data = [];
+		$Mission = new Mission();
+		$data['Mission'] = $Mission;
+		$data['tokenReplacements'] = ['<commodity>'=>'<span class="replaceableToken">&lt;commodity&gt;</span>','<tons>'=>'<span class="replaceableToken">&lt;tons&gt;</span>','<cargo>'=>'<span class="replaceableToken">&lt;cargo&gt;</span>','<bunks>'=>'<span class="replaceableToken">&lt;bunks&gt;</span>','<passengers>'=>'<span class="replaceableToken">&lt;passengers&gt;</span>','<fare>'=>'<span class="replaceableToken">&lt;fare&gt;</span>','<origin>'=>'<span class="replaceableToken">&lt;origin&gt;</span>','<planet>'=>'<span class="replaceableToken">&lt;planet&gt;</span>','<system>'=>'<span class="replaceableToken">&lt;system&gt;</span>','<destination>'=>'<span class="replaceableToken">&lt;destination&gt;</span>','<stopovers>'=>'<span class="replaceableToken">&lt;stopovers&gt;</span>','<planet stopovers>'=>'<span class="replaceableToken">&lt;planet stopovers&gt;</span>','<waypoints>'=>'<span class="replaceableToken">&lt;waypoints&gt;</span>','<payment>'=>'<span class="replaceableToken">&lt;payment&gt;</span>','<fine>'=>'<span class="replaceableToken">&lt;fine&gt;</span>','<date>'=>'<span class="replaceableToken">&lt;date&gt;</span>','<day>'=>'<span class="replaceableToken">&lt;day&gt;</span>','<npc>'=>'<span class="replaceableToken">&lt;npc&gt;</span>','<npc model>'=>'<span class="replaceableToken">&lt;npc model&gt;</span>','<first>'=>'<span class="replaceableToken">&lt;first&gt;</span>','<last>'=>'<span class="replaceableToken">&lt;last&gt;</span>','<ship>'=>'<span class="replaceableToken">&lt;ship&gt;</span>'];
+
+		$data['source'] = ['name'=>'web entry','file'=>'(n/a)','version'=>'new'];
+		return $this->render('sky/missionEditor.html.twig', $data);
+	}
+
 	#[Route('/sky/conversationSpec', name: 'SkyConversationSpec')]
 	public function conversationSpec(Request $request): Response {
 		if (!$request->request->has('conversation')) {
 			$this->addFlash('error','No conversation specified for writing!');
 			return new RedirectResponse($this->generateUrl('SkyEditHome'));
 		}
-		
+
 		$conversationJSON = $request->request->all()['conversation'];
-		
+
 		$Conversation = new Conversation();
 		$Conversation->setFromJSON($conversationJSON);
 		$stringWriter = new DataWriter('');
 		$Conversation->save($stringWriter);
-		
+
 		$response = new Response($stringWriter->getString());
 		$response->headers->set('Content-Type','text/plain');
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/newConversation', name: 'SkyNewConversation')]
 	public function newConversation(Request $request): Response {
 		$Conversation = new Conversation();
@@ -526,30 +542,107 @@ class SkyController extends AbstractController {
 				}
 			}
 		}
-		
+
 		//$data['testSystem'] = $data['systems']['Heia Due'];
-		
+
 		//error_log('Known colors: '.print_r($this->skyService->getData()['colors'],true));
-		
+
 		$this->logger->debug('Rendering');
         return $this->render('sky/galaxy.html.twig', $data);
     }
-	
+
+	#[Route('/sky/plugins', name: 'SkyPlugins')]
+	public function plugins(Request $request): Response {
+		$data = array();
+		$data['plugins'] = $this->em->getRepository(Plugin::class)->findAll();
+
+		return $this->render('sky/plugin/list.html.twig', $data);
+	}
+
+	#[Route('/sky/newPlugin', name: 'SkyNewPlugin')]
+	public function newPlugin(Request $request): Response {
+		$this->denyAccessUnlessGranted('ROLE_USER', null, 'You need to be logged in to create a plugin.');
+		$data = array();
+
+		$pluginForm = $this->createFormBuilder(array())
+						->add('name', TextType::class, ['label' => 'Plugin Name: '])
+						->add('description', TextareaType::class, ['label' => 'Plugin Description', 'attr'=>['rows'=>5]])
+						->add('submit', SubmitType::class, ['label' => 'Create Plugin'])
+						->getForm();
+
+		$pluginForm->handleRequest($request);
+
+		if ($pluginForm->isSubmitted() && $pluginForm->isValid()) {
+			$Plugin = new Plugin();
+			$Plugin->setName($pluginForm['name']->getData());
+			$Plugin->setDescription($pluginForm['description']->getData());
+			$Plugin->setAuthor($this->getUser());
+			$now = new \DateTime();
+			$Plugin->setDateCreated($now);
+			$Plugin->setDateModified($now);
+			$this->em->persist($Plugin);
+
+			$sourceInfo = ['name'=>$Plugin->getName(),'file'=>$Plugin->getName().'.txt','version'=>'new','dir'=>''];
+			$PluginFile = new DataFile($sourceInfo, false);
+			$PluginFile->setPlugin($Plugin);
+			$this->em->persist($PluginFile);
+			$this->em->flush();
+
+			return new RedirectResponse($this->generateUrl('SkyEditPlugin', ['pluginId'=>$Plugin->getId()]));
+		}
+
+		$data['pluginForm'] = $pluginForm;
+
+		return $this->render('sky/plugin/new.html.twig', $data);
+	}
+
+	#[Route('/sky/plugin/{pluginId}', name: 'SkyEditPlugin')]
+	public function plugin(Request $request, int $pluginId): Response {
+		$this->denyAccessUnlessGranted('ROLE_USER', null, 'You need to be logged in to edit a plugin.');
+		$data = array();
+
+		$Plugin = $this->em->getRepository(Plugin::class)->find($pluginId);
+		if (!$Plugin) {
+			$this->addFlash('error', 'Plugin ID '.$pluginId.' not found.');
+			return new RedirectResponse($this->generateUrl('SkyPlugins'));
+		}
+		$data['Plugin'] = $Plugin;
+
+		$pluginForm = $this->createFormBuilder(array())
+						->add('name', TextType::class, ['label' => 'Plugin Name: ', 'data'=>$Plugin->getName()])
+						->add('description', TextareaType::class, ['label' => 'Plugin Description', 'data'=>$Plugin->getDescription(), 'attr'=>['rows'=>5]])
+						->add('submit', SubmitType::class, ['label' => 'Update Plugin Info'])
+						->getForm();
+
+		$pluginForm->handleRequest($request);
+
+		if ($pluginForm->isSubmitted() && $pluginForm->isValid()) {
+			$Plugin->setName($pluginForm['name']->getData());
+			$Plugin->setDescription($pluginForm['description']->getData());
+			$Plugin->setDateModified(new \DateTime());
+			$this->em->flush();
+		}
+
+		$data['pluginForm'] = $pluginForm;
+
+		return $this->render('sky/plugin/edit.html.twig', $data);
+	}
+
 	// #[Route('/sky/system/{systemName}/{startDay}', name: 'SkyEditSystem')]
 	// public function system(Request $request, string $systemName, int $startDay = -1): Response {
 	// 	$this->skyService->loadUniverse();
 	// 	$this->skyService->loadImageDB();
-		
+
 	// 	$data = array();
 	// 	$data['systemName'] = $systemName;
 	// 	if ($startDay == -1) {
 	// 		$startDay = rand(1, 365 * 4);
 	// 	}
 	// 	$data['startDay'] = $startDay;
-		
+
 	// 	return $this->render('sky/systemFrame.html.twig', $data);
 	// }
-	
+
 	// #[Route('/sky/planetInfo', name: 'SkyPlanetInfo')]
 	// public function planetInfo(Request $request): Response {
 	// 	$planetName = $request->request->get('planetName');
@@ -623,10 +716,37 @@ class SkyController extends AbstractController {
 	// 	// 		}
 	// 	// 	}
 	// 	// }
-	// 	// 
+	// 	//
 	// 	// $data['prerequisites'] = $prerequisites;
 	// 	// $data['revPrerequisites'] = $reversePrerequisites;
-		
+
 	// 	return $this->render('sky/missiontest.html.twig', $data);
 	// }
+
+	#[Route("/esMap", name: "ESMap")]
+	public function esMap(Request $request): Response {
+		return $this->render('newGalaxy.html.twig');
+	}
+
+	#[Route('/esImage/@{loc}/{path}', name: 'ESImage', requirements: ['path' => '.+'])]
+	public function esImage(Request $request, string $loc, string $path): Response {
+		if ($loc == "root") {
+			$rootPath = $_ENV['ES_ROOT'];
+		} else if ($loc == "config") {
+			$rootPath = $_ENV['ES_CONFIG'];
+		} else {
+			throw new NotFoundHttpException();
+		}
+		$fullPath = $rootPath.$path;
+		$type = pathinfo($fullPath)['extension'];
+		$response = new BinaryFileResponse($fullPath);
+		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
+		$response->headers->set('Content-Type', 'image/'.$type);
+
+		// Cache the image files each for a week
+		$expires = (60*60*24*7);
+		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
+
+		return $response;
+	}
 }
