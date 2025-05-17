@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpKernel\EventListener\AbstractSessionListener;
 
 use App\Service\ESDataService;
 
@@ -49,5 +50,19 @@ class SpriteController extends AbstractController {
         $jsonData = json_decode($jsonDataStr);
 
         return new JsonResponse($jsonData);
+	}
+
+	#[Route('/sprites/{path}', name: 'SpritePath', requirements: ['path' => '.+'])]
+	public function image(Request $request, string $path): Response {
+		$response = new BinaryFileResponse($_ENV['ES_ROOT'] . $path);
+		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
+		$type = substr($path, -3);
+		$response->headers->set('Content-Type', 'image/'.$type);
+
+		// Cache the image files each for a week
+		$expires = (60*60*24*7);
+		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
+
+		return $response;
 	}
 }
