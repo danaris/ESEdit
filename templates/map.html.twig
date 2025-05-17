@@ -1,0 +1,32 @@
+{% extends 'base.html.twig' %}
+
+{% block javascripts %}
+<script src="/s-assets/sRegister.js"></script>
+<script src="{{ asset('js/flexMap.js') }}"></script>
+<script src="{{ asset('js/es-map.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<es-map id="esGalaxy" width="5000" height="5000">
+	{% for layer in mapLayers %}
+	<map-data-layer name="{{ layer.name }}" display-name="{{ layer.displayName|raw }}" parent="map" start-visible="true" controllable="{% if layer.controllable == 1 %}true{% else %}false{% endif %}" icon-url="{{ layer.iconUrl }}" extra-info="{{ layer.extraInfo|replace({'"': '\''})|raw }}"></map-data-layer>
+	{% endfor %}
+	<map-layer-group name="Map" short-name="map" load-url="{{ path('GalaxyMapData') }}" map="true" names="false" data="false" visible="true"></map-layer-group>
+	{# <map-layer-group name="Systems" short-name="systems" load-url="{{ path('MapSeaInfo', {worldId: world}) }}" map="true" names="true" data="false" visible="true"></map-layer-group> #}
+	<map-layer name="map" id="mapLayer" visible="true"></map-layer>
+	<map-layer name="systemLinks" id="systemLinksLayer" visible="true"></map-layer>
+	<map-layer name="systems" id="systemsLayer" visible="true"></map-layer>
+	<map-layer name="systemNames" id="systemNamesLayer" visible="true"></map-layer>
+	<map-layer name="wormholes" id="wormholesLayer" visible="true"></map-layer>
+</es-map>
+
+<script>
+function galaxyLoaded(map) {
+	map.centerSystem("Rutilicus");
+}
+
+var galaxy = document.getElementById('esGalaxy');
+galaxy.planetLoadUrl = '{{ path('MapPlanetData', {planetName: '~replace~'}) }}';
+galaxy.addPostLoadCallback(galaxyLoaded);
+</script>
+{% endblock %}
