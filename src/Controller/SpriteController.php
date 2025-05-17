@@ -54,7 +54,7 @@ class SpriteController extends AbstractController {
 
 	#[Route('/sprites/{path}', name: 'SpritePath', requirements: ['path' => '.+'])]
 	public function image(Request $request, string $path): Response {
-		$response = new BinaryFileResponse($_ENV['ES_ROOT'] . $path);
+		$response = new BinaryFileResponse($_ENV['ES_ROOT'].'/images/' . $path);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$type = substr($path, -3);
 		$response->headers->set('Content-Type', 'image/'.$type);
