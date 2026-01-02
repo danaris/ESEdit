@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+<title>Sprites Test</title>
+<script src="{{ asset('js/es/esParser.js') }}"></script>
+<script src="{{ asset('js/es/esObjects.js') }}"></script>
+<script src="{{ asset('js/es/esSprites.js') }}"></script>
+<script>
+var fileNodes = {};
+var filePaths = [];
+// Get the list of files from the server
+var pathsFetch = fetch('{{ path('ESSpriteFiles') }}');
+pathsFetch.then((response) => {
+	response.json().then((data) => {
+		filePaths = data;
+		console.log(filePaths);
+
+		for (var path of filePaths) {
+			ESSpriteSet.load(path);
+		}
+	});
+});
+
+// Request them one at a time
+// Parse each one
+function parseFile(filename) {
+	var dataFile = new ESDataFile(filename, function() { fileNodes[filename] = this.root; console.log('Parsed file ' + filename); });
+}
+// Once we have the whole thing, we can save a pre-parsed copy
+</script>
+</head>
+<body>
+<p>Parsing Test!</p>
+</body>
+</html>
