@@ -1,0 +1,22 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Create Plugin{% endblock %}
+{% block stylesheets %}
+<style>
+#form {
+	max-width: 50%;
+}
+#form div {
+	display: grid;
+	grid-template-columns: 10rem auto;
+	margin-bottom: 0.25rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<p>To create a new plugin, fill in the information below. Once it is created, you will be able to add data to it.</p>
+
+{{ form(pluginForm) }}
+
+{% endblock %}

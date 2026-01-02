@@ -37,8 +37,11 @@
 {% endblock %}
 <script>
 function nameEsc(name) {
-	var escString = name.replace(/[ ']/g, '-').replace(/[()]/g,'_');
-	
+	if (!name || name == undefined) {
+		console.log('Failed to escape a non-name');
+	}
+	var escString = name.replace(/[* ']/g, '-').replace(/[()]/g,'_');
+
 	return escString;
 }
 </script>

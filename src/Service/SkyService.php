@@ -26,28 +26,30 @@ use App\Entity\Sky\UniverseObjects;
 use App\Entity\Sky\Wormhole;
 
 class SkyService {
-	
+
 	protected array $images = array();
 	protected array $elements = array();
 	protected array $data = array();
 	protected array $errors = array();
-	public string $basePath = ''; 
+	public string $basePath = '';
 	public string $dataBasePath = '';
 	public string $imageBasePath = '';
-	
+
 	public array $plugins = array();
-	
+
 	protected string $dataCachePath = '/var/cache/skyEdit.skyData';
 	protected string $universeCachePath = '/var/cache/skyEditUniverse.skyData';
 	protected string $imageCachePath = '/var/cache/skyEditImages.skyData';
 	protected string $configPath = '/var/cache/skyEdit.config';
-	
+
 	protected array $config = array();
-	
+
 	protected bool $debug = false;
-	
+
 	private bool $loaded = false;
-	
+
+	private static $creatableTypes = ['Mission'];
+
 	public function __construct(protected LoggerInterface $logger,
 								protected SerializerInterface $serializer,
 								protected EntityManagerInterface $em,
@@ -59,20 +61,20 @@ class SkyService {
 		$this->dataCachePath = $projectDir.$this->dataCachePath;
 		$this->universeCachePath = $projectDir.$this->universeCachePath;
 		$this->imageCachePath = $projectDir.$this->imageCachePath;
-		
+
 		$taService = TemplatedArrayService::Instance();
 		$taService->setEntityManager($this->em);
-		
+
 		$this->data['galaxies'] = array();
 		$this->data['systems'] = array();
 		$this->data['governments'] = array();
 		$this->data['wormholes'] = array();
 		$this->data['colors'] = array();
 		$this->data['planets'] = array();
-		
+
 		$this->data['missions'] = array();
 	}
-	
+
 	public function truncateTables($tableNames = array(), $cascade = false) {
 		$connection = $this->em->getConnection();
 		$platform = $connection->getDatabasePlatform();
@@ -82,7 +84,7 @@ class SkyService {
 		}
 		$connection->executeQuery('SET FOREIGN_KEY_CHECKS = 1;');
 	}
-	
+
 	public function loadUniverseFromFiles($checkCache = true, $loadImages = true) {
 		if ($this->loaded) {
 			$this->logger->debug('LUFF already loaded, skipping');
@@ -105,22 +107,22 @@ class SkyService {
 			if (!$loaded) {
 				$sources = [['name'=>'vanilla','dir'=>$_ENV['DATA_PATH'],'version'=>'0.10.3b (c6d74ba3)']];
 				GameData::SetSources($sources);
-				//$this->loadImageDB();		
+				//$this->loadImageDB();
 				$images = GameData::FindImages();
-				
+
 				// From the name, strip out any frame number, plus the extension.
 				foreach ($images as $imageName => $ImageSet) {
 					// This should never happen, but just in case:
 					if (!$ImageSet) {
 						continue;
 					}
-				
+
 					// Reduce the set of images to those that are valid.
 					$ImageSet->validateFrames();
 				}
 				SpriteSet::SetImageData($images);
 				GameData::Objects()->load($sources, true, $this->em);
-				
+
 				// $universeSerial = serialize(GameData::Objects());
 				// file_put_contents($this->universeCachePath, $universeSerial);
 			} else if ($loadImages) {
@@ -134,31 +136,31 @@ class SkyService {
 		$this->logger->debug('LUFF done');
 		$this->loaded = true;
 	}
-	
+
 	public function getImages() {
 		return $this->images;
 	}
-	
+
 	public function getElements() {
 		return $this->elements;
 	}
-	
+
 	public function getData() {
 		return $this->data;
 	}
-	
+
 	public function getErrors() {
 		return $this->errors;
 	}
-	
+
 	public function clearDataCache() {
 		unlink($this->dataCachePath);
 	}
-	
+
 	public function clearImageCache() {
 		unlink($this->imageCachePath);
 	}
-	
+
 	public function addPlugin($name, $path) {
 		if (substr($path, -1)) {
 			$path .= '/';
@@ -166,7 +168,7 @@ class SkyService {
 		$plugin = ['name'=>$name,'basePath'=>$path];
 		$this->plugins []= $this->prepPlugin($plugin);
 	}
-	
+
 	public function removePlugin($name) {
 		$pluginIndex = -1;
 		for ($i=0; $i<count($this->plugins); $i++) {
@@ -178,13 +180,13 @@ class SkyService {
 			array_splice($this->plugins, $pluginIndex, 1);
 		}
 	}
-	
+
 	public function prepPlugin($plugin) {
 		$plugin['dataBasePath'] = $plugin['basePath'].'data/';
 		$plugin['imageBasePath'] = $plugin['basePath'].'images/';
 		return $plugin;
 	}
-	
+
 	public function loadConfig() {
 		$this->config = json_decode(file_get_contents($this->configPath), true);
 		if (isset($this->config['basePath'])) {
@@ -199,7 +201,7 @@ class SkyService {
 			}
 		}
 	}
-	
+
 	public function saveConfig() {
 		$saveConfig = array();
 		$saveConfig['basePath'] = $this->basePath;
@@ -212,11 +214,11 @@ class SkyService {
 			$savePlugins []= $savePlugin;
 		}
 		$saveConfig['plugins'] = $savePlugins;
-		
+
 		$configJSON = json_encode($saveConfig);
 		file_put_contents($this->configPath, $configJSON);
 	}
-	
+
 	function loadImageDB() {
 		if (file_exists($this->imageCachePath)) {
 			$this->images = json_decode(file_get_contents($this->imageCachePath), true);
@@ -226,7 +228,7 @@ class SkyService {
 			file_put_contents($this->imageCachePath, $imageJSON);
 		}
 	}
-	
+
 	function buildImageDB() {
 		if (count($this->config) == 0) {
 			$this->loadConfig();
@@ -236,7 +238,7 @@ class SkyService {
 			$this->images = array_merge($this->images, $this->processImageDir($plugin['imageBasePath'], ''));
 		}
 	}
-	
+
 	function processImageDir($baseDir, $imageDir) {
 		if (strlen($imageDir) > 0 && substr($imageDir, -1) != '/') {
 			$imageDir .= '/';
@@ -263,7 +265,7 @@ class SkyService {
 		}
 		return $imagesHere;
 	}
-	
+
 	function processDataDir($baseDir, $dataDir) {
 		//$this->logger->info('Processing data from '.$dataDir);
 		if (strlen($dataDir) > 0 && substr($dataDir, -1) != '/') {
@@ -287,7 +289,7 @@ class SkyService {
 		}
 		return $dataHere;
 	}
-	
+
 	function loadData() {
 		if (file_exists($this->dataCachePath)) {
 			$this->elements = json_decode(file_get_contents($this->dataCachePath), true);
@@ -297,12 +299,12 @@ class SkyService {
 			file_put_contents($this->dataCachePath, $dataJSON);
 		}
 	}
-	
+
 	function importData($checkCache=true) {
 		if (count($this->config) == 0) {
 			$this->loadConfig();
 		}
-		
+
 		if (!$checkCache) {
 			$this->elements = $this->processDataDir($this->dataBasePath, '');
 			$dataJSON = json_encode($this->elements);
@@ -313,18 +315,18 @@ class SkyService {
 		foreach ($this->plugins as $plugin) {
 			$this->elements = array_merge($this->elements, $this->processDataDir($plugin['dataBasePath'], ''));
 		}
-		
+
 		//$this->logger->info('Got '.count($data).' elements');
-		
+
 		$galaxies = $this->data['galaxies'];
 		$systems = $this->data['systems'];
 		$governments = $this->data['governments'];
 		$wormholes = $this->data['wormholes'];
 		$colors = $this->data['colors'];
 		$planets = $this->data['planets'];
-		
+
 		$missions = $this->data['missions'];
-		
+
 		foreach ($this->elements as $dKey => $element) {
 			if ($dKey == '_filename') {
 				//$this->logger->info('Data from '.$element);
@@ -337,9 +339,9 @@ class SkyService {
 					$thisGalaxy->name = $element['_name'];
 					foreach ($element as $elKey => $elVal) {
 						if ($elKey == 'pos') {
-							$thisGalaxy->pos = new Point();
-							$thisGalaxy->pos->x = floatval($elVal[0][0]);
-							$thisGalaxy->pos->y = floatval($elVal[0][1]);
+							$thisGalaxy->position = new Point();
+							$thisGalaxy->position->x = floatval($elVal[0][0]);
+							$thisGalaxy->position->y = floatval($elVal[0][1]);
 						} else if ($elKey == 'sprite') {
 							if (isset($elVal[0]['_name'])) {
 								$thisGalaxy->sprite = $elVal[0]['_name'];
@@ -364,9 +366,9 @@ class SkyService {
 							}
 							//$this->logger->info('Processing system ['.$thisSystem['name'].']');
 						} else if ($elKey == 'pos') {
-							$thisSystem->pos = new Point();
-							$thisSystem->pos->x = floatval($elVal[0][0]);
-							$thisSystem->pos->y = floatval($elVal[0][1]);
+							$thisSystem->position = new Point();
+							$thisSystem->position->x = floatval($elVal[0][0]);
+							$thisSystem->position->y = floatval($elVal[0][1]);
 						} else if ($elKey == 'link') {
 							foreach ($elVal as $lKey => $link) {
 								if ($lKey == 'link') {
@@ -575,7 +577,7 @@ class SkyService {
 				// 			if (isset($elVal[0][1])) {
 				// 				$illegalArray['message'] = $elVal[0][1];
 				// 			}
-				// 			
+				//
 				// 			$thisMission->illegal = $illegalArray;
 				// 		} else if ($elKey == 'cargo') {
 				// 			$this->logger->debug(' - setting the cargo');
@@ -700,7 +702,7 @@ class SkyService {
 					break;
 			}
 		}
-		
+
 		foreach ($wormholes as $wormholeName => $wormhole) {
 			//$this->logger->info('Post-processing wormhole '.$wormhole['name']);
 			foreach ($wormhole->links as $linkId => $link) {
@@ -711,17 +713,17 @@ class SkyService {
 				$wormholes[$wormholeName]->links[$linkId]->angle = $angle;
 			}
 		}
-		
+
 		$this->data['galaxies'] = $galaxies;
 		$this->data['systems'] = $systems;
 		$this->data['colors'] = $colors;
 		$this->data['governments'] = $governments;
 		$this->data['wormholes'] = $wormholes;
 		$this->data['planets'] = $planets;
-		
+
 		$this->data['missions'] = $missions;
 	}
-	
+
 	public function arrayToRamscoop($array) {
 		$ramscoop = new Ramscoop();
 		if ($array['universal'] == 0) {
@@ -731,20 +733,20 @@ class SkyService {
 		}
 		$ramscoop->addend = floatval($array['addend']);
 		$ramscoop->multiplier = floatval($array['multiplier']);
-		
+
 		return $ramscoop;
 	}
-	
+
 	public function arrayToConditionList($array) {
 		$conditions = array();
-		
+
 		foreach ($array as $key => $val) {
 			if ($key == 'never') {
 				$condition = new Condition();
 				$condition->never = true;
-				
+
 				$conditions []= $condition;
-				
+
 				continue;
 			}
 			if ($key == 'has') {
@@ -760,14 +762,14 @@ class SkyService {
 				$condition = new Condition();
 				$condition->or = $this->arrayToConditionList($val[0]);
 				$conditions []= $condition;
-				
+
 				continue;
 			} else if ($key == 'and') {
 				$this->logger->debug('-- Processing "and" condition with value '.print_r($val, true));
 				$condition = new Condition();
 				$condition->and = $this->arrayToConditionList($val[0]);
 				$conditions []= $condition;
-				
+
 				continue;
 			} else if (in_array($key, ['_depth','_name'])) {
 				continue;
@@ -781,13 +783,13 @@ class SkyService {
 			$condition->attribute = $attribute;
 			$condition->test = $test;
 			$condition->val = floatval($testVal);
-			
+
 			$conditions []= $condition;
 		}
-		
+
 		return $conditions;
 	}
-	
+
 	public function arrayToLocationFilter($array) {
 		$distCalcKeys = ['all wormholes','only unrestricted wormholes','no wormholes','assumes jump drive'];
 		foreach ($array as $fKey => $filter) {
@@ -1061,10 +1063,10 @@ class SkyService {
 				}
 			}
 		}
-		
+
 		return $thisFilter;
 	}
-	
+
 	public function arrayToSystemObject($system, $parent, $array) {
 		foreach ($array as $oKey => $object) {
 			$thisObject = new SystemObject();
@@ -1120,9 +1122,9 @@ class SkyService {
 			}
 		}
 	}
-	
+
 	public function angleBetween($fromPoint, $toPoint) {
-		
+
 		$rise = $toPoint->y - $fromPoint->y;
 		$run = $toPoint->x - $fromPoint->x;
 		if ($run == 0) {
@@ -1132,21 +1134,21 @@ class SkyService {
 				return 270;
 			}
 		}
-		
+
 		$slope = $rise / $run;
-		
+
 		$angle = atan($slope);
-		
+
 		$angleDeg = rad2deg($angle);
 		if ($rise < 0 && $run > 0) {
 			$angleDeg += 360;
 		} else if ($rise < 0 || $run < 0) {
 			$angleDeg += 180;
 		}
-		
+
 		return $angleDeg;
 	}
-	
+
 	function processDataFile($fullPath) {
 		$data = file_get_contents($fullPath);
 		$lines = explode("\n", $data);
@@ -1179,10 +1181,10 @@ class SkyService {
 			//$this->logger->info('Adding line ['.$line.'] to active section');
 			$sectionLines []= $line;
 		}
-		
+
 		return $elements;
 	}
-	
+
 	function processSectionTop($line) {
 		$thisElement = array();
 		list($depth, $tokens) = $this->tokenize($line);
@@ -1209,7 +1211,7 @@ class SkyService {
 		$thisElement['_depth'] = $depth;
 		return [$tokens[0], $thisElement];
 	}
-	
+
 	function processLeaf($line) {
 		$thisLeaf = array();
 		list($depth, $tokens) = $this->tokenize($line);
@@ -1225,7 +1227,7 @@ class SkyService {
 		$thisLeaf['_depth'] = $depth;
 		return [$tokens[0], $thisLeaf];
 	}
-	
+
 	function processSection($lines) {
 		if ($this->debug) {
 			$this->logger->info('Processing section with '.count($lines).' lines...');
@@ -1264,7 +1266,7 @@ class SkyService {
 				}
 			} else {
 				$curDepth = $nextDepth;
-			
+
 				if ($i < count($lines) - 1) {
 					for ($k=0; $k<strlen($lines[$i+1]); $k++) {
 						if ($lines[$i+1][$k] != '	') {
@@ -1342,10 +1344,10 @@ class SkyService {
 				}
 			}
 		}
-		
+
 		return [$sectionType, $thisElement, -1];
 	}
-	
+
 	function tokenize($line) {
 		$tokens = array();
 		$curTokenId = -1;
@@ -1396,7 +1398,7 @@ class SkyService {
 		}
 		return [$depth, $tokens];
 	}
-	
+
 	function floatToIntColor($colorArray) {
 		$redF = floatval($colorArray[0]);
 		$greenF = floatval($colorArray[1]);
@@ -1406,5 +1408,5 @@ class SkyService {
 		$blueI = round(255 * $blueF);
 		return [$redI,$greenI,$blueI];
 	}
-	
+
 }

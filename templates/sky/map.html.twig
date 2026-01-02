@@ -23,7 +23,7 @@
 .systemName.hidden {
 	fill-opacity: 0.4;
 }
-.systemName:hover {
+.systemName:hover, .systemName.highlighted {
 	fill-opacity: 1.0;
 }
 .systemName.hidden:hover {
@@ -212,10 +212,19 @@ $(function() {
 	// 	$("#galaxyMap").append(galaxySVG);
 	// }
 	$("#galaxySvg").html($("#galaxySvg").html());
-	var centerX = 2048 + centerSystem.position.x - window.visualViewport.width/2;
-	var centerY = 2048 + centerSystem.position.y - window.visualViewport.height/2;
-	window.scrollTo(centerX, centerY);
+	centerOnSystem(centerSystem);
 });
+function centerOnSystem(system) {
+	var centerX = 2048 + system.position.x - window.visualViewport.width/2;
+	var centerY = 2048 + system.position.y - window.visualViewport.height/2;
+	window.scrollTo(centerX, centerY);
+}
+function findSystemByName(systemName) {
+	if (systems[systemName]) {
+		centerOnSystem(systems[systemName]);
+		$("#"+nameEsc(systemName)+"-systemName").addClass("highlighted");
+	}
+}
 </script>
 <svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 4096 4096" id="galaxySvg">
 	<defs>

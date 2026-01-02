@@ -1,0 +1,27 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Edit Plugin {{ Plugin.name }}{% endblock %}
+{% block stylesheets %}
+<style>
+#form {
+	max-width: 50%;
+}
+#form div {
+	display: grid;
+	grid-template-columns: 10rem auto;
+	margin-bottom: 0.25rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{{ form(pluginForm) }}
+
+<h3>Plugin Files</h3>
+<ul>
+{% for File in Plugin.files %}
+	<li>{{ File.source['file'] }}{% if File.root.children|length > 0 %}<ul><li>has stuff in it</li></ul>{% else %} - empty{% endif %}</li>
+{% endfor %}
+
+{% endblock %}

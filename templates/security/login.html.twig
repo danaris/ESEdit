@@ -1,0 +1,60 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Log in!{% endblock %}
+{% block stylesheets %}
+<style>
+fieldset {
+	width: 50%;
+	max-width: 20rem;
+	display: grid;
+	grid-template-columns: 7rem auto;
+	grid-row-gap: 0.25rem;
+}
+legend {
+	white-space: nowrap;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+    <form method="post">
+        {% if error %}
+            <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+        {% endif %}
+
+        {% if app.user %}
+            <div class="mb-3">
+                You are logged in as {{ app.user.userIdentifier }}, <a href="{{ path('app_logout') }}">Logout</a>
+            </div>
+        {% endif %}
+
+        <h1 class="h3 mb-3 font-weight-normal">Please sign in or create an account.</h1>
+		<fieldset>
+			<legend>Sign In</legend>
+        	<label for="username">Username</label>
+        	<input type="text" value="{{ last_username }}" name="_username" id="username" class="form-control" autocomplete="username" required autofocus>
+        	<label for="password">Password</label>
+        	<input type="password" name="_password" id="password" class="form-control" autocomplete="current-password" required>
+		</fieldset>
+
+        <input type="hidden" name="_csrf_token"
+               value="{{ csrf_token('authenticate') }}"
+        >
+
+        {#
+            Uncomment this section and add a remember_me option below your firewall to activate remember me functionality.
+            See https://symfony.com/doc/current/security/remember_me.html
+
+            <div class="checkbox mb-3">
+                <label>
+                    <input type="checkbox" name="_remember_me"> Remember me
+                </label>
+            </div>
+        #}
+
+        <button class="btn btn-lg btn-primary" type="submit">
+            Sign in
+        </button>
+    </form>
+	<p><a href="{{ path("SkyResetPassword") }}">Forgot Password</a> ~ <a href="{{ path("SkyRegister") }}">Create Account</a></p>
+{% endblock %}

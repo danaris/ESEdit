@@ -1,0 +1,126 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ mission['name'] }} ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<style>
+#missionContainer {
+	margin-top: 1rem;
+}
+.fieldContainer {
+	display: grid;
+	grid-template-columns: 12em auto;
+}
+.fieldContainer > div > p, .fieldContainer > div > ul {
+	margin-top: 0px;
+}
+</style>
+{% endblock %}
+{% block lateScripts %}
+<script src="{{ asset('js/displayEdit.js') }}"></script>
+<script>
+var mission;
+var missionFetch = fetch("{{ path('MissionJSON', {missionName: mission['name']}) }}");
+missionFetch.then((response) => {
+	var missionJSON = response.json();
+	missionJSON.then((missionData) => {
+		mission = missionData;
+
+
+	});
+});
+</script>
+{% endblock %}
+
+{% block content %}
+{{ dump(mission) }}
+<script>
+$(function() {
+
+});
+</script>
+<div id="missionContainer">
+	<display-edit-text style="width: 40rem;" field-name="missionName" field-label="Mission Name:" field-value="{{ mission['name'] }}"></display-edit-text>
+	<display-edit-text style="width: 40rem;" field-name="missionDisplayName" field-label="Mission Display Name:" field-value="{{ mission['displayName'] }}">{% for token, replacement in tokenReplacements %}
+		<replace search="{{ token }}" replace="{{ replacement }}"></replace>
+		{% endfor %}</display-edit-text>
+	<display-edit-textarea rows="5" cols="50" field-name="missionDescription" field-label="Mission Description:">
+		<text>{{ mission['description'] }}</text>
+		{% for token, replacement in tokenReplacements %}
+		<replace search="{{ token }}" replace="{{ replacement }}"></replace>
+		{% endfor %}
+	</display-edit-textarea>
+	<display-edit-select field-name="missionLocation" style="width: 7em;" field-label="Mission Offered At:" field-value="{{ mission['location'] }}">
+		<option>spaceport</option>
+		<option>landing</option>
+		<option>job</option>
+		<option>assisting</option>
+		<option>boarding</option>
+		<option>shipyard</option>
+		<option>outfitter</option>
+	</display-edit-select>
+	<div class="fieldContainer">
+		<div>Source:</div>
+		<div>
+			{% if mission['source'] %}
+				<p>{{ mission['source'] }}</p>
+			{% else %}
+				{% set filter = mission['sourceFilter'] %}
+				{% include 'helpers/locationFilter.html.twig' %}
+			{% endif %}
+		</div>
+	</div>
+	<div class="fieldContainer">
+		<div>Destination:</div>
+		<div>
+			{% if mission['destination'] %}
+				<p>{{ mission['destination'] }}</p>
+			{% elseif not mission['destinationFilter']|length == 0 %}
+				{# {% set filter = mission['destinationFilter'] %}
+				{% include 'sky/locationFilter.html.twig' %} #}
+			{% else %}
+				(Source Planet)
+			{% endif %}
+		</div>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionMinor">Minor:</label><input type="checkbox" name="missionMinor" value="true"{% if mission['isMinor'] %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionAutosave">Autosave:</label><input type="checkbox" name="missionAutosave" value="true"{% if mission['autosave'] %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionOverridesCapture">Overrides Capture:</label><input type="checkbox" name="missionOverridesCapture" value="true"{% if mission['overridesCapture'] %} checked{% endif %}>
+	</div>
+	<display-edit-text style="width: 20rem;" field-name="missionDeadlineBase" field-label="Mission Deadline Base:" field-value="{{ mission['deadlineBase'] }}"></display-edit-text>
+	<display-edit-text style="width: 20rem;" field-name="missionDeadlineMultiplier" field-label="Mission Deadline Multiplier:" field-value="{{ mission['deadlineMultiplier'] }}"></display-edit-text>
+	<div class="fieldContainer">
+		<label for="missionClearance">Clearance:</label><input type="checkbox" name="missionClearance" value="true"{% if mission['clearance'] %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionIgnoreClearance">Ignore Clearance:</label><input type="checkbox" name="missionIgnoreClearance" value="true"{% if mission['ignoreClearance'] %} checked{% endif %}>
+	</div>
+	<div class="fieldContainer">
+		<label for="missionInfiltrating">Infiltrating:</label><input type="checkbox" name="missionInfiltrating" value="true"{% if not mission['hasFullClearance'] %} checked{% endif %}>
+	</div>
+	<display-edit-text style="width: 20rem;" field-name="missionRepeat" field-label="Repeat:" field-value="{{ mission['repeat'] }}"></display-edit-text>
+	{% set conditions = {'Offer': mission['toOffer'], 'Accept': mission['toAccept'], 'Complete': mission['toComplete'], 'Fail': mission['toFail']} %}
+	{% for condName, condition in conditions %}
+		<div class="fieldContainer">
+			<div>To {{ condName }}:</div>
+			<div>
+				{% set setId = mission['name'] ~ '-to' ~ condName %}
+				{% set conditionSetLabel = setId %}
+				{% set isChild = false %}
+				{% include 'helpers/conditionSet.html.twig' %}
+			</div>
+		</div>
+	{% endfor %}
+	{% for actionData in mission['actions'] %}
+		{% set actionTrigger = triggerNames[actionData[0]] %}
+		{% set action = actionData[1] %}
+	<div class="fieldContainer">
+		{% include 'helpers/missionAction.html.twig' %}
+	</div>
+	{% endfor %}
+</div>
+{% endblock %}

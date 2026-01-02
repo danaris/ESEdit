@@ -19,7 +19,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 	#[ORM\GeneratedValue]
 	#[ORM\Column(type: 'integer')]
 	private int $id;
-	
+
 	// These are "child" nodes found on subsequent lines with deeper indentation.
 	#[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent', cascade: ['persist'])]
 	protected Collection $children; // DataNode array
@@ -33,12 +33,12 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 	// The line number in the given file that produced this node.
 	#[ORM\Column(type: 'integer')]
 	protected int $lineNumber = 0;
-	
+
 	#[ORM\Column(type: 'boolean')]
 	protected bool $isChanges = false;
-	
+
 	private int $iterIndex = 0;
-	
+
 	#[ORM\Column(type: 'string')]
 	private string $sourceName = '';
 	#[ORM\Column(type: 'string')]
@@ -46,19 +46,22 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 	#[ORM\Column(type: 'string')]
 	private string $sourceVersion = '';
 
+	#[ORM\OneToOne(mappedBy: 'root')]
+	private ?DataFile $file = null;
+
     #[ORM\ManyToOne(inversedBy: 'changes')]
     private ?GameEvent $changeEvent = null;
-	
+
 	#[ORM\PreFlush]
 	public function toDatabase(PreFlushEventArgs $eventArgs) {
 		$this->tokensStr = json_encode($this->tokens);
 	}
-	
+
 	#[ORM\PostLoad]
 	public function fromDatabase(PostLoadEventArgs $eventArgs) {
 		$this->tokens = json_decode($this->tokensStr, true);
 	}
-	
+
 	// Construct a DataNode and remember what its parent is.
 	public function __construct(DataNode $parent = null, DataNode $other = null, ?array $source = null) {
 		$this->children = new ArrayCollection();
@@ -79,23 +82,23 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 			}
 		}
 	}
-	
+
 	// Get the number of tokens in this line of the data file.
 	public function size(): int {
 		return count($this->tokens);
 	}
-	
+
 	// Get all tokens.
 	public function getTokens(): array {
 		return $this->tokens;
 	}
-	
+
 	// Get the token with the given index. No bounds checking is done.
 	// DataFile loading guarantees index 0 always exists.
 	public function getToken(int $index): string {
 		return $this->tokens[$index];
 	}
-	
+
 	public function getSourceName(): string {
 		return $this->sourceName;
 	}
@@ -103,7 +106,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		$this->sourceName = $sourceName;
 		return $this;
 	}
-	
+
 	public function getSourceFile(): string {
 		return $this->sourceFile;
 	}
@@ -111,7 +114,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		$this->sourceFile = $sourceFile;
 		return $this;
 	}
-	
+
 	public function getSourceVersion(): string {
 		return $this->sourceVersion;
 	}
@@ -119,7 +122,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		$this->sourceVersion = $sourceVersion;
 		return $this;
 	}
-	
+
 	public function setIsChanges(bool $changes, bool $recurse=false): void {
 		$this->isChanges = $changes;
 		if ($recurse) {
@@ -129,7 +132,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		}
 	}
 
-	
+
 	// Convert the token with the given index to a numerical value.
 	public function getValue(int $index): float {
 		// Check for empty strings and out-of-bounds indices.
@@ -140,10 +143,10 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		} else {
 			return DataNode::TokenValue($this->tokens[$index]);
 		}
-	
+
 		return 0.0;
 	}
-	
+
 	// Static helper function for any class which needs to parse string -> number.
 	public static function TokenValue(string $token): float {
 		// Allowed format: "[+-]?[0-9]*[.]?[0-9]*([eE][+-]?[0-9]*)?".
@@ -152,18 +155,18 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 			return 0.0;
 		}
 		$tokenIndex = 0;
-	
+
 		// Check for leading sign.
 		$sign = ($token[0] == '-') ? -1. : 1.;
 		$tokenIndex += ($token[0] == '-' || $token[0] == '+');
-	
+
 		// Digits before the decimal point.
 		$value = 0;
 		while (isset($token[$tokenIndex]) && $token[$tokenIndex] >= '0' && $token[$tokenIndex] <= '9') {
 			$value = ($value * 10) + intval($token[$tokenIndex]);
 			$tokenIndex++;
 		}
-	
+
 		// Digits after the decimal point (if any).
 		$power = 0;
 		if (isset($token[$tokenIndex]) && $token[$tokenIndex] == '.') {
@@ -173,35 +176,35 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 				$power--;
 			}
 		}
-	
+
 		// Exponent.
 		if (isset($token[$tokenIndex]) && ($token[$tokenIndex] == 'e' || $token[$tokenIndex] == 'E')) {
 			$tokenIndex++;
 			$expSign = ($token[$tokenIndex] == '-') ? -1 : 1;
 			$tokenIndex += ($token[$tokenIndex] == '-' || $token[$tokenIndex] == '+');
-	
+
 			$exponent = 0;
 			while (isset($token[$tokenIndex]) && $token[$tokenIndex] >= '0' && $token[$tokenIndex] <= '9')
 				$exponent = ($exponent * 10) + intval($token[$tokenIndex]);
 				$tokenIndex++;
-	
+
 			$power += $expSign * $exponent;
 		}
-	
+
 		// Compose the return value.
 		return $value * pow(10.0, $power) * $sign;
 	}
-	
+
 	// Check if the token at the given index is a number in a format that this
 	// class is able to parse.
 	public function isNumber(int $index): bool {
 		// Make sure this token exists and is not empty.
 		if($index >= count($this->tokens) || !$this->tokens[$index])
 			return false;
-	
+
 		return DataNode::TokenIsNumber($this->tokens[$index]);
 	}
-	
+
 	public static function TokenIsNumber(string $token): bool {
 		$hasDecimalPoint = false;
 		$hasExponent = false;
@@ -234,7 +237,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		}
 		return true;
 	}
-	
+
 	// Convert the token at the given index to a boolean. This returns false
 	// and prints an error if the index is out of range or the token cannot
 	// be interpreted as a number.
@@ -248,10 +251,10 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 			$token = $this->tokens[$index];
 			return $token == "true" || $token == "1";
 		}
-	
+
 		return false;
 	}
-	
+
 	// Check if the token at the given index is a boolean, i.e. "true"/"1" or "false"/"0"
 	// as a string.
 	public function isBool(int $index): bool {
@@ -259,47 +262,47 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		if ($index >= count($this->tokens) || !$this->tokens[$index]) {
 			return false;
 		}
-	
+
 		return DataNode::TokenIsBool($this->tokens[$index]);
 	}
-	
+
 	public static function TokenIsBool(string $token): bool {
 		return $token == "true" || $token == "1" || $token == "false" || $token == "0";
 	}
-	
+
 	// Check if this node has any children.
 	public function hasChildren(): bool {
 		return count($this->children) > 0;
 	}
-	
-	public function getChildren(): array|ArrayCollection {
+
+	public function getChildren(): array|Collection {
 		return $this->children;
 	}
-	
+
 	public function setLineNumber(int $lineNumber): void {
 		$this->lineNumber = $lineNumber;
 	}
-	
+
 	public function addToken(string $token): void {
 		$this->tokens []= $token;
 	}
-	
+
 	public function current(): DataNode {
 		return $this->children[$this->children->getKeys()[$this->iterIndex]];
 	}
-	
+
 	public function key(): mixed { // scalar
 		return array_keys($this->children)[$this->iterIndex];
 	}
-	
+
 	public function next(): void {
 		$this->iterIndex++;
 	}
-	
+
 	public function rewind(): void {
 		$this->iterIndex = 0;
 	}
-	
+
 	public function offsetExists(mixed $offset): bool {
 		return isset($this->children[$offset]);
 	}
@@ -316,11 +319,11 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 	public function offsetUnset(mixed $offset): void {
 		unset($this->children[$offset]);
 	}
-	
+
 	public function count(): int {
 		return count($this->children);
 	}
-	
+
 	public function valid(): bool {
 		if ($this->iterIndex < 0) {
 			return false;
@@ -332,16 +335,16 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		if (isset($this->children[$childKey])) {
 			return true;
 		}
-		
+
 		return false;
 	}
-	
+
 	// Print a message followed by a "trace" of this node and its parents.
 	public function printTrace(string $message = ''): int {
 		if($message) {
 			error_log($message);
 		}
-	
+
 		// Recursively print all the parents of this node, so that the user can
 		// trace it back to the right point in the file.
 		$indent = 0;
@@ -351,7 +354,7 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 		if (count($this->tokens) <= 0) {
 			return $indent;
 		}
-	
+
 		// Convert this node back to tokenized text, with quotes used as necessary.
 		$line = !$this->parent ? "" : "L" . $this->lineNumber . ": ";
 		$line = str_pad($line, strlen($line) + $indent, ' ');
@@ -370,15 +373,15 @@ class DataNode implements \Iterator, \ArrayAccess, \Countable {
 			}
 		}
 		error_log($line);
-	
+
 		// Put an empty line in the log between each error message.
 		if($message)
 			error_log('');
-	
+
 		// Tell the caller what indentation level we're at now.
 		return $indent;
 	}
-	
+
 	// Adjust the parent pointers when a copy is made of a DataNode.
 	public function reparent(): void {
 		foreach ($children as $child) {

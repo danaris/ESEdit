@@ -44,7 +44,7 @@ class ConditionSet {
 	#[ORM\OneToOne(targetEntity: GameAction::class, mappedBy: 'conditions', cascade: ['persist'])]
 	private GameAction $conversationAction;
 	
-	#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Node', inversedBy: 'conditions', cascade: ['persist'])]
+	//#[ORM\OneToOne(targetEntity: 'App\Entity\Sky\Node', inversedBy: 'conditions', cascade: ['persist'])]
 	public Node $conversationNode;
 	
 	#[ORM\OneToOne(targetEntity: Element::class, inversedBy: 'conditions', cascade: ['persist'])]

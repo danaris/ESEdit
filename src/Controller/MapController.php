@@ -48,6 +48,11 @@ class MapController extends AbstractController {
 	public function galaxyData(Request $request): Response {
 		$esData = $this->dataService->data();
 
+		$spoilersAllowed = false;
+		if ($request->cookies->has('spoilerFree') && $request->cookies->get('spoilerFree') == 'false') {
+			$spoilersAllowed = true;
+		}
+
 		$galaxyData = array();
 		$governmentColors = array();
 		foreach ($esData['governments'] as $govName => $gov) {
@@ -93,13 +98,24 @@ class MapController extends AbstractController {
 		$foundLinks = [];
 
 		foreach ($esData['systems'] as $systemName => $system) {
+			
 			$xPos = ($milkyWayWidth / 2) + $system['position']['x'] - 2;
 			$yPos = ($milkyWayHeight / 2) + $system['position']['y'] - 2;
-			if ($system['government']) {
-				$govColor = $governmentColors[$system['government']];
-			} else {
-				$govColor = $governmentColors['Uninhabited'];
+			$govName = 'Uninhabited';
+			$inhabited = false;
+			foreach ($system['objects'] as $stellarObject) {
+				if ($stellarObject['planet']) {
+					$inhabited = true;
+					$planet = $esData['planets'][$stellarObject['planet']];
+					if ($planet && $planet['government']) {
+						$govName = $planet['government'];
+					}
+				}
 			}
+			if ($inhabited && $govName == 'Uninhabited' && $system['government']) {
+				$govName = $system['government'];
+			}
+			$govColor = $governmentColors[$govName];
 			$systemData = [
 				'type'=>'system',
 				'name'=>$systemName,

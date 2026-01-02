@@ -1,0 +1,616 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Galaxy ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<link rel="stylesheet" href="/css/govColors.css"/>
+<style>
+.system {
+	cursor: pointer;
+}
+.Uninhabited-system.unoccupied {
+	fill: black;
+	stroke: rgb(102,102,102);
+}
+.Unexplored-system {
+	stroke: var(--faint);
+}
+.systemName {
+	fill-opacity: 0.7;
+	fill: white;
+	cursor: pointer;
+	font-family: sans-serif;
+}
+.systemName.hidden {
+	fill-opacity: 0.4;
+}
+.systemName:hover, .systemName.highlighted {
+	fill-opacity: 1.0;
+}
+.systemName.hidden:hover {
+	fill-opacity: 0.7;
+}
+#systemDialog {
+	display: none;
+}
+.systemChildObjects {
+	margin-left: 2em;
+}
+.system-link {
+	stroke-width: 1px;
+	stroke: lightgray;
+	stroke-opacity: 0.7;
+}
+.hasAttribute {
+	stroke-width: 2px;
+	stroke: rgb(102,102,204);
+}
+.controlsAttribute {
+	cursor: pointer;
+}
+.wormhole {
+	stroke-width: 2px;
+}
+.hovering {
+	font-weight: bold;
+	stroke-width: 4px;
+}
+#skyTop {
+	position: fixed;
+}
+#systemDetails-dialog {
+	background-color: var(--dim);
+	color: var(--bright);
+	position: fixed;
+	left: -50%;
+	top: 30px;
+}
+.systemLabelField {
+	display: grid;
+	grid-template-columns: 12em auto;
+}
+</style>{% endblock %}
+
+{% block content %}
+<script src="{{ path("SkyColorsJS") }}"></script>
+<script src="{{ path("SkySpritesJS") }}"></script>
+<script src="{{ path("SkyGovernmentsJS") }}"></script>
+<script src="{{ path("SkySystemsJS") }}"></script>
+<script src="{{ path("SkyPlanetsJS") }}"></script>
+<script src="{{ path("SkyGalaxiesJS") }}"></script>
+<script src="{{ path("SkyWormholesJS") }}"></script>
+<script src="{{ asset("js/displayEdit.js") }}"></script>
+<script>
+var selectedSystem = null;
+var systemDialog = null;
+var mainMap = null;
+var sysNameXOffset = 0;
+var sysNameYOffset = 18;
+
+function cssColor(color) {
+	if (typeof color !== 'object') {
+		if (colors[color] != undefined) {
+			color = colors[color];
+		} else {
+			return 'rgb(0,0,0)';
+		}
+	}
+
+	return 'rgba('+Math.round(color.red * 255)+', '+Math.round(color.green * 255)+', '+Math.round(color.blue * 255)+', ' + Math.round(color.alpha * 255)+')';
+}
+function angleBetween(fromPoint, toPoint) {
+
+	var rise = toPoint.y - fromPoint.y;
+	var run = toPoint.x - fromPoint.x;
+	if (run == 0) {
+		if (rise > 0) {
+			return 90;
+		} else {
+			return 270;
+		}
+	}
+
+	var slope = rise / run;
+
+	var angle = Math.atan(slope);
+
+	var angleDeg = angle * (180/Math.PI);
+	if (rise < 0 && run > 0) {
+		angleDeg += 360;
+	} else if (rise < 0 || run < 0) {
+		angleDeg += 180;
+	}
+
+	return angleDeg;
+}
+var spoilerFreeGovernments = ['Republic','Syndicate','Pirate','Free Worlds'];
+var centerSystem = null;
+if (systems['Rutilicus'] != undefined) {
+	centerSystem = systems['Rutilicus'];
+}
+var curHoverSystem = null;
+function hoverSystem(event) {
+	var systemName = event.target.attributes.systemName.value;
+	if (curHoverSystem && curHoverSystem.name != systemName) {
+		unhoverSystem();
+		curHoverSystem = systems[systemName];
+	}
+	$(".system-" + nameEsc(systemName)).addClass("hovering");
+	if (selectedSystem && selectedSystem.name == systemName) {
+		selectedSystem.svg.style.cursor = 'grab';
+	}
+}
+function unhoverSystem(event) {
+	$(".hovering").removeClass("hovering");
+	curHoverSystem = null;
+	if (selectedSystem) {
+		selectedSystem.svg.classList.add('hovering');
+		selectedSystem.nameSvg.classList.add('hovering');
+	}
+}
+function showSystem(systemName) {
+	var system = systems[systemName];
+	selectedSystem = system;
+
+	if (systemDialog == null) {
+		systemDialog = document.getElementById('systemDetails-dialog');
+	}
+	systemDialog.show();
+
+	var systemNameField = document.getElementById('systemNameField');
+	systemNameField.setValue(systemName);
+
+	var systemGovernmentField = document.getElementById('systemGovernmentField');
+	if (systemGovernmentField.children.length == 0) {
+		var optionMap = [];
+		for (var govName in governments) {
+			optionMap[govName] = govName;
+		}
+		systemGovernmentField.setOptions(optionMap);
+	}
+	systemGovernmentField.setValue(system.government);
+
+	var systemAttributesField = document.getElementById('systemAttributesField');
+	var systemAttributes = "";
+	for (var a in system.attributes) {
+		if (systemAttributes != "") {
+			systemAttributes += "\n";
+		}
+		systemAttributes += system.attributes[a];
+	}
+	systemAttributesField.setValue(systemAttributes);
+
+	var systemPositionLabel = document.getElementById('systemPositionLabel');
+	systemPositionLabel.textContent = '(' + system.position.x + ', ' + system.position.y + ')';
+
+	system.svg.classList.add('hovering');
+	system.nameSvg.classList.add('hovering');
+}
+$(function() {
+	mainMap = document.getElementById('galaxySvg');
+	for (var systemName in systems) {
+		var system = systems[systemName];
+		system.svg = null;
+		system.nameSvg = null;
+		system.fromLinkSvgs = [];
+		system.toLinkSvgs = [];
+		system.fromWormholeSvgs = [];
+		system.fromWormholeArrowSvgs = [];
+		system.toWormholeSvgs = [];
+		system.toWormholeArrowSvgs = [];
+	}
+	for (var systemName in systems) {
+		var showThisSystem = true;
+		var system = systems[systemName];
+		if (spoilerFree) {
+			if (!spoilerFreeGovernments.includes(system.government)) {
+				showThisSystem = false;
+			}
+		}
+		var sysStatus = 'unoccupied';
+		var governmentName = 'Unexplored';
+		if (showThisSystem) {
+			if (system.government != 'Uninhabited' && system.inhabited) {
+				sysStatus = 'occupied';
+			}
+			governmentName = system.government;
+		}
+		var systemSVG = document.createElementNS('http://www.w3.org/2000/svg','use');
+		systemSVG.id = nameEsc(systemName);
+		systemSVG.setAttribute('href', '#system');
+		if (system.hidden) {
+			systemSVG.style.strokeOpacity = 0.5;
+		}
+		systemSVG.classList.add('system');
+		systemSVG.classList.add('system-'+nameEsc(systemName));
+		systemSVG.classList.add(nameEsc(governmentName)+'-system');
+		systemSVG.classList.add(sysStatus);
+		systemSVG.setAttribute('systemName', systemName);
+		systemSVG.setAttribute('x', 2048 + system.position.x);
+		systemSVG.setAttribute('y', 2048 + system.position.y);
+		systemSVG.onclick = clickSystem;
+		systemSVG.onmouseover = hoverSystem;
+		systemSVG.onmouseout = unhoverSystem;
+		var systemSVGTitle = document.createElementNS('http://www.w3.org/2000/svg','title');
+		systemSVGTitle.textContent = system.name;
+		systemSVG.appendChild(systemSVGTitle);
+		system.svg = systemSVG;
+
+		systemLayer.appendChild(systemSVG);
+
+		var nameLen = systemName.length;
+		var systemNameSVG = document.createElementNS('http://www.w3.org/2000/svg','text');
+		systemNameSVG.id = nameEsc(systemName)+'-systemName';
+		systemNameSVG.setAttribute('text-anchor','middle');
+		systemNameSVG.classList.add('systemName');
+		systemNameSVG.classList.add('system-'+nameEsc(systemName));
+		systemNameSVG.setAttribute('systemName', systemName);
+		if (system.hidden) {
+			systemNameSVG.classList.add('hidden');
+		}
+		systemNameSVG.setAttribute('x', 2048 + system.position.x - sysNameXOffset);
+		systemNameSVG.setAttribute('y', 2048 + system.position.y - sysNameYOffset);
+		systemNameSVG.onclick = clickSystem;
+		systemNameSVG.textContent = systemName;
+		system.nameSvg = systemNameSVG;
+
+		nameLayer.appendChild(systemNameSVG);
+
+		var displaySystem = showThisSystem;
+		for (var i in system.links) {
+			var toName = system.links[i];
+			var linkId = nameEsc(systemName)+'-'+nameEsc(toName);
+			if ($("#"+linkId).length > 0) {
+				continue;
+			}
+			var toSystem = systems[toName];
+			if (!displaySystem && spoilerFreeGovernments.includes(toSystem.government)) {
+				displaySystem = true;
+			}
+			var systemLinkSVG = document.createElementNS('http://www.w3.org/2000/svg','line');
+			systemLinkSVG.id = linkId+'-link';
+			systemLinkSVG.classList.add('system-link');
+			systemLinkSVG.classList.add('system-'+nameEsc(systemName));
+			systemLinkSVG.setAttribute('x1', 2048 + system.position.x);
+			systemLinkSVG.setAttribute('y1', 2048 + system.position.y);
+			systemLinkSVG.setAttribute('x2', 2048 + toSystem.position.x);
+			systemLinkSVG.setAttribute('y2', 2048 + toSystem.position.y);
+
+			linkLayer.appendChild(systemLinkSVG);
+			system.fromLinkSvgs.push(systemLinkSVG);
+			toSystem.toLinkSvgs.push(systemLinkSVG);
+		}
+
+		if (displaySystem) {
+			// $("#systems").append(systemSVG);
+			if (showThisSystem) {
+				// $("#systemNames").append(systemNameSVG);
+				// $("#systemLinks").append(systemLinksSVG);
+
+				if (centerSystem == null) {
+					centerSystem = system;
+				}
+			}
+		}
+	}
+	if (!spoilerFree) {
+		for (var wormholeName in wormholes) {
+			var wormhole = wormholes[wormholeName];
+
+			for (var fromName in wormhole.links) {
+				var fromSystem = systems[fromName];
+				var inactiveFrom = (fromSystem.hidden || fromSystem.inaccessible);
+
+				var toName = wormhole.links[fromName];
+				var toSystem = systems[toName];
+
+				var inactiveTo = (toSystem.hidden || toSystem.inaccessible);
+
+				var wormholeColor = colors['map wormhole'];
+				if (wormhole.linkColor) {
+					wormholeColor = wormhole.linkColor;
+				}
+				wormholeColor = cssColor(wormholeColor);
+
+				var angle = angleBetween(fromSystem.position, toSystem.position);
+
+				var wormholeSVG = document.createElementNS('http://www.w3.org/2000/svg','line');
+				wormholeSVG.id = nameEsc(fromName)+'-'+nameEsc(toName)+'-hole';
+				wormholeSVG.setAttribute('fromSystemName', fromSystem.name);
+				wormholeSVG.setAttribute('toSystemName', toSystem.name);
+				wormholeSVG.classList.add('wormhole');
+				wormholeSVG.classList.add('system-'+nameEsc(fromSystem.name));
+				wormholeSVG.setAttribute('x1', 2048 + fromSystem.position.x);
+				wormholeSVG.setAttribute('y1', 2048 + fromSystem.position.y);
+				wormholeSVG.setAttribute('x2', 2048 + toSystem.position.x);
+				wormholeSVG.setAttribute('y2', 2048 + toSystem.position.y);
+				wormholeSVG.style.stroke = wormholeColor;
+				if (inactiveFrom || inactiveTo) {
+					wormholeSVG.style.strokeOpacity = 0.3;
+				} else {
+					wormholeSVG.style.strokeOpacity = 0.7;
+				}
+				var wormholeArrowSVG = document.createElementNS('http://www.w3.org/2000/svg','use');
+				wormholeArrowSVG.id = nameEsc(fromName)+'-'+nameEsc(toName)+'-hole-arrow';
+				wormholeArrowSVG.classList.add('wormhole');
+				wormholeArrowSVG.classList.add('system-'+nameEsc(fromSystem.name));
+				wormholeArrowSVG.setAttribute('href', '#revArrow');
+				wormholeArrowSVG.setAttribute('x', 2048 + fromSystem.position.x);
+				wormholeArrowSVG.setAttribute('y', 2048 + fromSystem.position.y);
+				wormholeArrowSVG.style.stroke = wormholeColor;
+				wormholeArrowSVG.style.strokeWidth = '2px';
+				wormholeArrowSVG.setAttribute('transform', 'rotate('+angle+' '+(2048 + fromSystem.position.x)+' '+(2048 + fromSystem.position.y)+')');
+
+				wormholeLayer.appendChild(wormholeSVG);
+				wormholeLayer.appendChild(wormholeArrowSVG);
+				fromSystem.fromWormholeSvgs.push(wormholeSVG);
+				fromSystem.fromWormholeArrowSvgs.push(wormholeArrowSVG);
+				toSystem.toWormholeSvgs.push(wormholeSVG);
+				toSystem.toWormholeArrowSvgs.push(wormholeArrowSVG);
+			}
+		}
+	}
+
+	for (var galaxyName in galaxies) {
+		addGalaxySprite(galaxies[galaxyName]);
+	}
+	centerOnSystem(centerSystem);
+});
+function centerOnSystem(system) {
+	var centerX = 2048 + system.position.x - window.visualViewport.width/2;
+	var centerY = 2048 + system.position.y - window.visualViewport.height/2;
+	window.scrollTo(centerX, centerY);
+}
+function findSystemByName(systemName) {
+	if (systems[systemName]) {
+		centerOnSystem(systems[systemName]);
+		$("#"+nameEsc(systemName)+"-systemName").addClass("highlighted");
+	}
+}
+function clickMap(event) {
+	if (selectedSystem == null) {
+		return;
+	}
+	console.log("Clicked the map");
+	if (systemDialog && systemDialog.open) {
+		systemDialog.close();
+	}
+	selectedSystem.svg.classList.remove('hovering');
+	selectedSystem.nameSvg.classList.remove('hovering');
+	selectedSystem.svg.onmousedown = null;
+	selectedSystem.svg.onmouseup = null;
+}
+function clickSystem(event) {
+	var systemName = event.target.attributes.systemName.value;
+
+	if (!selectedSystem || selectedSystem.name != systemName) {
+		showSystem(systemName);
+		selectedSystem.svg.onmousedown = grabSystem;
+		selectedSystem.svg.onmouseup = ungrabSystem;
+	}
+
+	event.stopPropagation();
+}
+function grabSystem(event) {
+	var systemName = event.target.attributes.systemName.value;
+
+	var system = systems[systemName];
+	if (selectedSystem == system) {
+		system.svg.style.cursor = 'grabbing';
+		mainMap.onmousemove = dragSystem;
+	}
+
+	event.stopPropagation();
+}
+function ungrabSystem(event) {
+	var systemName = event.target.attributes.systemName.value;
+
+	var system = systems[systemName];
+	if (selectedSystem == system) {
+		system.svg.style.cursor = 'grab';
+		mainMap.onmousemove = null;
+	}
+
+	event.stopPropagation();
+}
+function dragSystem(event) {
+	var systemX = event.offsetX;
+	var systemY = event.offsetY;
+
+	var dataSystemX = systemX - 2048;
+	var dataSystemY = systemY - 2048;
+	selectedSystem.position = {'x': dataSystemX, 'y': dataSystemY};
+	selectedSystem.svg.setAttribute('x', systemX);
+	selectedSystem.svg.setAttribute('y', systemY);
+	selectedSystem.nameSvg.setAttribute('x', systemX - sysNameXOffset);
+	selectedSystem.nameSvg.setAttribute('y', systemY - sysNameYOffset);
+	var systemPositionLabel = document.getElementById('systemPositionLabel');
+	systemPositionLabel.textContent = '(' + dataSystemX + ', ' + dataSystemY + ')';
+
+	for (var l in selectedSystem.fromLinkSvgs) {
+		var link = selectedSystem.fromLinkSvgs[l];
+		link.setAttribute('x1', systemX);
+		link.setAttribute('y1', systemY);
+	}
+	for (var l in selectedSystem.toLinkSvgs) {
+		var link = selectedSystem.toLinkSvgs[l];
+		link.setAttribute('x2', systemX);
+		link.setAttribute('y2', systemY);
+	}
+	for (var w in selectedSystem.fromWormholeSvgs) {
+		var wormhole = selectedSystem.fromWormholeSvgs[w];
+		var wormholeArrow = selectedSystem.fromWormholeArrowSvgs[w];
+		var toSystem = systems[wormhole.getAttribute('toSystemName')];
+		var angle = angleBetween(selectedSystem.position, toSystem.position);
+		wormhole.setAttribute('x1', systemX);
+		wormhole.setAttribute('y1', systemY);
+		wormholeArrow.setAttribute('x', systemX);
+		wormholeArrow.setAttribute('y', systemY);
+		wormholeArrow.setAttribute('transform', 'rotate('+angle+' '+(2048 + systemX)+' '+(2048 + systemY)+')');
+	}
+	for (var w in selectedSystem.toWormholeSvgs) {
+		var wormhole = selectedSystem.toWormholeSvgs[w];
+		var wormholeArrow = selectedSystem.toWormholeArrowSvgs[w];
+		var fromSystem = systems[wormhole.getAttribute('fromSystemName')];
+		var angle = angleBetween(fromSystem.position, selectedSystem.position);
+		wormhole.setAttribute('x2', systemX);
+		wormhole.setAttribute('y2', systemY);
+		wormholeArrow.setAttribute('transform', 'rotate('+angle+' '+(2048 + fromSystem.position.x)+' '+(2048 + fromSystem.position.y)+')');
+	}
+}
+</script>
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 4096 4096" id="galaxySvg" onclick="clickMap(event);">
+	<defs>
+		<g id="system">
+			<circle cx="0" cy="0" r="5" stroke-width="3" />
+		</g>
+		<g id="arrow">
+			<g>
+				<path d="M 8,-4 L 0,0 L 8,4 L 8,-4" />
+			</g>
+		</g>
+		<g id="revArrow">
+			<g>
+				<path d="M 25,-8 L 41,0 L 25,8" fill="none" />
+			</g>
+		</g>
+	</defs>
+	<g id="galaxyMap">
+	</g>
+	<g id="systemLinks">
+	</g>
+	<g id="wormholes">
+	</g>
+	<g id="systems">
+	</g>
+	<g id="systemNames">
+	</g>
+</svg>
+
+<dialog id="systemDetails-dialog" class="systemDetails">
+	<display-edit-text class="sysDetail systemName" id="systemNameField" field-name="systemName" field-label="Name: "></display-edit-text>
+	<div class="sysDetail systemPosition systemLabelField"><div>Position:</div><div id="systemPositionLabel">(x, x)</div></div>
+	<display-edit-select class="sysDetail systemGovernment" id="systemGovernmentField" field-name="systemGovernment" field-label="Government: "></display-edit-select>
+	<display-edit-textarea class="sysDetail systemAttributes" id="systemAttributesField" field-name="systemAttributes" field-label="Attributes: "></display-edit-textarea>
+	<div class="sysDetail systemObjects">
+	{# {% for object in system.objects %}
+		<p>System Objects:</p>
+		{% if object.planet %}<div class="sysObjectName">{{ object.planet.name }}</div>{% endif %}
+		<div class="sysDetail sysObjectSprite">Sprite: {{ object.sprite.name }}</div>
+		<div class="sysDetail sysObjectDistance">Distance: {{ object.distance }}</div>
+		<div class="sysDetail sysObjectPeriod">Period: {{ object.speed / 360 }}</div>
+		{% if object.offset %}<div class="sysDetail sysObjectOffset">Offset: {{ object.offset }}</div>{% endif %}
+		{% if object.children|length > 0 %}
+		<div class="sysDetail systemChildObjects">
+			<p>Children:</p>
+			{% for child in object.children %}
+			{% if child.planet %}<div class="sysObjectName">{{ child.planet.name }}</div>{% endif %}
+			<div class="sysDetail sysObjectSprite">Sprite: {{ child.sprite.name }}</div>
+			<div class="sysDetail sysObjectDistance">Distance: {{ child.distance }}</div>
+			<div class="sysDetail sysObjectPeriod">Period: {{ child.speed / 360 }}</div>
+			{% if child.offset %}<div class="sysDetail sysObjectOffset">Offset angle: {{ child.offset }}</div>{% endif %}
+			{% endfor %}
+		</div>
+		{% endif %}
+	{% endfor %} #}
+	</div>
+	<button type="button" onclick="submitSystem();">Update System Info</button>
+</dialog>
+
+<dialog id="systemDialog" title="System View">
+
+</dialog>
+
+<div id="mapControls" title="Controls">
+	<details>
+		<summary>Attributes</summary>
+		<ul id="controlsAttributes">
+		</ul>
+	</details>
+</div>
+{% endblock %}
+
+{% block lateScripts %}
+<script>
+var allAttributes = [];
+function highlightAttribute(attributeName) {
+	for (var systemName in systems) {
+		var system = systems[systemName];
+		var hasAttribute = false;
+		for (var j=0; j<system.attributes.length; j++) {
+			if (system.attributes[j] == attributeName) {
+				hasAttribute = true;
+				break;
+			}
+		}
+		if (hasAttribute) {
+			$("#"+nameEsc(system.name)+'-systemName').addClass('hasAttribute');
+		} else {
+			$("#"+nameEsc(system.name)+'-systemName').removeClass('hasAttribute');
+		}
+	}
+
+	$(".controlsAttribute").css('font-weight','');
+	$("#controlsAttribute"+nameEsc(attributeName)).css('font-weight','bold');
+}
+$(function() {
+	$("#systemDialog").dialog({
+		  autoOpen: false,
+		  height: 600,
+		  width: 550,
+		  modal: true,
+		  close: function() {
+			  $("#systemDialog").dialog('close');
+		  }
+		});
+	for (var systemName in systems) {
+		var system = systems[systemName];
+		console.log('Getting attributes for system [' + systemName + ']');
+		console.log('they are [' + system.attributes + ']');
+		for (var j=0; j<system.attributes.length; j++) {
+			var attribute = system.attributes[j];
+			if (!allAttributes.includes(attribute)) {
+				allAttributes.push(attribute);
+			}
+		}
+	}
+	allAttributes.sort();
+	for (var i=0; i<allAttributes.length; i++) {
+		var attribute = allAttributes[i];
+		$("#controlsAttributes").append('<li class="controlsAttribute" id="controlsAttribute'+nameEsc(attribute)+'" onclick="highlightAttribute(\''+attribute+'\');">'+attribute+'</li>');
+	}
+	$("#mapControls").dialog({
+		  autoOpen: true,
+		  height: 250,
+		  width: 150,
+		  modal: false,
+		  close: function() {
+			  $("#systemDialog").dialog('mapControls');
+		  }
+		});
+});
+var mapLayer = document.getElementById('galaxyMap');
+var linkLayer = document.getElementById('systemLinks');
+var wormholeLayer = document.getElementById('wormholes');
+var systemLayer = document.getElementById('systems');
+var nameLayer = document.getElementById('systemNames');
+
+var spritePathBase = '/sprites/';
+
+function addGalaxySprite(galaxy) {
+	var galaxySprite = sprites[galaxy.sprite];
+	if (galaxySprite == undefined || !galaxySprite) {
+		return;
+	}
+
+	var spriteImage = document.createElementNS('http://www.w3.org/2000/svg','image');
+	spriteImage.id = galaxy.name + "-sprite";
+	spriteImage.setAttributeNS('http://www.w3.org/1999/xlink',"href",spritePathBase + galaxySprite.paths[0]);
+	spriteImage.setAttribute("x", 2048 + galaxy.position.x - (galaxySprite.width/2));
+	spriteImage.setAttribute("y", 2048 + galaxy.position.y - (galaxySprite.height/2));
+
+	galaxy.svg = spriteImage;
+
+	mapLayer.appendChild(spriteImage);
+}
+</script>
+{% endblock %}

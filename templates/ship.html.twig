@@ -1,0 +1,70 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ ship['name'] }} ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<style>
+#shipContainer {
+	margin-top: 1rem;
+}
+.fieldContainer {
+	display: grid;
+	grid-template-columns: 12em auto;
+}
+.fieldContainer > div > p, .fieldContainer > div > ul {
+	margin-top: 0px;
+}
+</style>
+{% endblock %}
+{% block lateScripts %}
+<script src="{{ asset('js/displayEdit.js') }}"></script>
+<script src="{{ asset('js/es-sprite.js') }}"></script>
+<script src="{{ asset('js/es-ship.js') }}"></script>
+<script>
+var sprites = null;
+var outfits = null;
+var colors = null;
+var dataLoadCallbacks = [];
+var ship;
+var shipFetch = fetch("{{ path('ShipJSON', {shipName: ship['trueModelName']}) }}");
+shipFetch.then((response) => {
+	var shipJSON = response.json();
+	shipJSON.then((shipData) => {
+		ship = shipData;
+
+
+	});
+});
+var spriteFetch = fetch("{{ path('DataJSON', {dataType: 'sprites'}) }}");
+var colorFetch = fetch("{{ path('DataJSON', {dataType: 'colors'}) }}");
+Promise.all([spriteFetch, colorFetch]).then((responses) => {
+	var spriteJSON = responses[0].json();
+	var colorJSON = responses[1].json();
+	Promise.all([spriteJSON, colorJSON]).then((data) => {
+		sprites = data[0].sprites;
+		colors = data[1].colors;
+
+		for (var callback of dataLoadCallbacks) {
+			callback();
+		}
+	});
+});
+function spriteToPath(spriteName, hiDPI = false, frame = 0) {
+	var sprite = sprites[spriteName];
+	if (hiDPI) {
+		paths = sprite['paths']['hiDPI'];
+	} else {
+		paths = sprite['paths']['standard'];
+	}
+
+	path = paths[0];
+	path = path.replace(['@root//images','@config//images'],['','']);
+
+	return path;
+}
+</script>
+{% endblock %}
+
+{% block content %}
+{{ dump(ship) }}
+<es-ship-display id="theShip" ship-load-url="{{ path('ShipJSON', {shipName: shipName}) }}"></es-ship-display>
+{% endblock %}

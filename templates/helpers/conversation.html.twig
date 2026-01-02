@@ -1,0 +1,39 @@
+{% set conversationName = '(Unnamed Conversation)' %}
+{% if 'name' in conversation %}
+	{% set conversationName = conversation.name %}
+{% elseif Mission is defined and action is defined %}
+	{% set conversationName = Mission.trueName ~ '-' ~ action.trigger %}
+{% endif %}
+
+<display-edit-conversation{% if conversation.id is defined %} conversation-id="{{ conversation.id }}"{% endif %} name="{{ conversationName }}"{% if conversationCallback %} conversation-callback="{{ conversationCallback }}"{% endif %}>
+	{% for labelName, labelIndex in conversation.labels %}
+		<label name="{{ labelName }}" value="{{ labelIndex }}"></label>
+	{% endfor %}
+	{% for nodeIndex, node in conversation.nodes %}
+		{% set myLabel = labelFromIndex(conversation.labels, nodeIndex) %}
+	<node{% if myLabel %} label="{{ myLabel }}"{% endif %} type="{% if node.isChoice %}choice{% elseif nodeIsBranch(node) %}branch{% else %}text{% endif %}"{% if node.scene %} scene="{{ node.scene }}"{% endif %}>
+		{% if node.conditions %}
+			{% set condition = node.conditions %}
+			{% set setId = conversationName ~ '-' ~ nodeIndex %}
+			{% set conditionSetLabel = setId %}
+			{% set isChild = false %}
+			{% include 'helpers/conditionSet.html.twig' %}
+		{% endif %}
+		{% for elementIndex, element in node.elements %}
+			{% if element.next > 0 %}
+				{% set nextLabel = labelFromIndex(conversation.labels, element.next) %}
+			{% endif %}
+		<element{% if nextLabel is defined and nextLabel != '' %} next-label="{{ nextLabel }}"{% else %} next-index="{{ element.next }}"{% endif %}>
+			{% if element.conditions %}
+				{% set condition = element.conditions %}
+				{% set setId = conversationName ~ '-' ~ nodeIndex ~ '-' ~ elementIndex %}
+				{% set conditionSetLabel = setId %}
+				{% set isChild = false %}
+				{% include 'helpers/conditionSet.html.twig' %}
+			{% endif %}
+			<text>{{ element.text }}</text>
+		</element>
+		{% endfor %}
+	</node>
+	{% endfor %}
+</display-edit-conversation>

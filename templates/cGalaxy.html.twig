@@ -1,0 +1,301 @@
+<!doctype html>
+<html>
+<head>
+	<title>Canvas Test</title>
+	<link rel="stylesheet" href="/css/sky.css?v=5">
+	<style>
+		:root {
+			--menuHeight: 1.4rem;
+		}
+		#systemDisplayDialog {
+			position: absolute;
+			left: 1rem;
+			top: 1rem;
+			background-color: var(--dimmer);
+			color: var(--bright);
+			width: 50rem;
+		}
+		#systemDisplay {
+			display: grid;
+			grid-template-rows: 1.2rem auto 1.5rem;
+			grid-row-gap: 0.5rem;
+		}
+		#systemDisplayHeader {
+			display: grid;
+			grid-template-columns: 1.5rem auto 1.5rem;
+			width: 100%;
+			height: 1.5rem;
+		}
+		#systemDisplayHeaderName {
+			height: 1.5rem;
+			grid-column-start: 2;
+			background-color: var(--faint);
+			border-radius: 0.8rem;
+			text-align: center;
+		}
+		#systemDisplayBody {
+			grid-template-columns: 50% 50%;
+		}
+		#sdbName {
+			grid-column-start: span 2;
+			text-align: center;
+			font-size: 125%;
+		}
+		#sdbGovernment {
+			grid-column-start: span 2;
+			text-align: center;
+		}
+		#content {
+			display: grid;
+			grid-template-rows: var(--menuHeight) auto;
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+		}
+		#menuBar {
+			display: grid;
+		}
+		.menuTitle {
+			padding-left: 1rem;
+			padding-right: 1rem;
+			cursor: pointer;
+			color: var(--medium);
+			height: calc(var(--menuHeight) - 0.1rem);
+			padding-top: 0.1rem;
+		}
+		.menuTitle:hover {
+			color: var(--bright);
+		}
+	</style>
+</head>
+<body>
+<div id="content">
+	<div id="menuBar">
+		<div class="menuTitle" id="pluginMenuTitle">Plugin</div>
+	</div>
+	<canvas id="canvasContainer" style="width: 100%; height: calc(100% - var(--menuHeight));">
+	</canvas>
+</div>
+<script type="module">
+import { MapPoint, CanvasMap } from "{{ asset('js/canvasMap.js') }}";
+
+function cssName(origString) {
+	return origString.replace(/\(\)/, '_').replace(/ '/, '-');
+}
+
+function colorToCSS(color) {
+	var red = parseFloat(color.red) * 255;
+	var green = parseFloat(color.green) * 255;
+	var blue = parseFloat(color.blue) * 255;
+	var alpha = parseFloat(color.alpha);
+	// This is weird—gotta figure out what causes it
+	if (alpha == 0) {
+		alpha = 1;
+	}
+	return 'rgba(' + red + ', ' + green + ', ' + blue + ', ' + alpha + ')';
+}
+
+function preloadImage(name, entry) {
+	entry.image = new Image();
+	var loadData = {'done': false, 'entry': entry, 'name': name};
+	imageLoads[name] = loadData;
+	entry.image.onload = function(event) { imageLoads[name].done = true; checkImagesLoaded(imageLoads); };
+	entry.image.src = '/sprite/' + encodeURI(entry.sprite);
+}
+
+function checkImagesLoaded(imageLoads) {
+	var allDone = true;
+	for (var name of Object.keys(imageLoads)) {
+		var load = imageLoads[name];
+		if (!load.done) {
+			allDone = false;
+			break;
+		}
+	}
+	if (allDone) {
+		for (var name of order) {
+			var load = imageLoads[name];
+			addMapImage(load.name, load.entry);
+		}
+
+		finishInit();
+	}
+}
+
+function addMapImage(name, entry) {
+	var entryOrigin = new MapPoint(entry.position.x, entry.position.y);
+	entryOrigin.x -= entry.image.width / 2;
+	entryOrigin.y -= entry.image.height / 2;
+	var mapImage = map.addImage(cssName(name), entry.image, entryOrigin);
+	mapImage.zIndex = -100;
+	console.log('Adding ' + name + ' at ' + entryOrigin);
+	// if (entry.x < min.x) {
+	// 	min.x = entry.x;
+	// }
+	// if (entry.y < min.y) {
+	// 	min.y = entry.y;
+	// }
+	// if (entry.x + entry.width > max.x) {
+	// 	max.x = entry.x + entry.width;
+	// }
+	// if (entry.y + entry.height > max.y) {
+	// 	max.y = entry.y + entry.height;
+	// }
+}
+
+var galaxies = null;
+var systems = null;
+var colors = null;
+var governments = null;
+
+var images = [];
+
+var map = new CanvasMap('canvasContainer');
+var newSize = {'w': window.innerWidth, 'h': window.innerHeight};
+map.setSize(newSize);
+
+var min = new MapPoint(0, 0);
+var max = new MapPoint(0, 0);
+
+var imageLoads = {};
+var order = [];
+
+var fetches = Promise.all([fetch('/data/galaxies.json'), fetch('/data/governments.json'), fetch('/data/systems.json'), fetch('/data/colors.json')]);
+fetches.then((responses) => {
+	var jsons = Promise.all([responses[0].json(), responses[1].json(), responses[2].json(), responses[3].json()]);
+	jsons.then((data) => {
+		galaxies = data[0]['galaxies'];
+		governments = data[1]['governments'];
+		systems = data[2]['systems'];
+		colors = data[3]['colors'];
+
+		initSprites();
+	});
+});
+
+function initSprites() {
+	for (var gName in galaxies) {
+		var entry = galaxies[gName];
+		if (entry.sprite) {
+			preloadImage(gName, entry);
+			order.push(gName);
+		}
+	}
+}
+
+function systemHoverCallback(map) {
+	var systemCircle = this.objects[0];
+	var systemText = this.objects[1];
+	systemCircle.path.lineWidth += 2;
+	systemText.color = 'white';
+
+	this.zIndex += 1;
+
+	map.element.style.cursor = 'pointer';
+}
+
+function systemUnhoverCallback(map) {
+	var systemCircle = this.objects[0];
+	var systemText = this.objects[1];
+	systemCircle.path.lineWidth -= 2;
+	systemText.color = colorToCSS(colors['bright']);
+
+	this.zIndex -= 1;
+
+	map.element.style.cursor = '';
+}
+
+function systemClickCallback(map) {
+	var system = this.data;
+	systemDisplayHeaderName.textContent = system.displayName;
+	sdbName.textContent = system.displayName;
+	sdbGovernment.textContent = system.government;
+	var borderStyle = "3px solid " + colorToCSS(governments[system.government].color);
+	sdbGovernment.style.borderBottom = borderStyle;
+	var systemPosition = new MapPoint(system.position.x, system.position.y);
+	sdbPosition.textContent = 'Position: ' + systemPosition;
+	sdbAttributes.textContent = 'Attributes: ' + system.attributes.join(", ");
+
+	systemDisplayDialog.show();
+}
+
+const average = array => array.reduce((a, b) => a + b) / array.length;
+
+function finishInit() {
+	var startOrigin = new MapPoint(0, 0);
+	var systemNameSize = 14;
+	var drawnLinks = [];
+	var govColors = {};
+	for (var govName in governments) {
+		var color = governments[govName].color;
+		if (color) {
+			govColors[govName] = colorToCSS(color);
+		}
+	}
+	var cssBright = colorToCSS(colors['bright']);
+	var cssDim = colorToCSS(colors['dim']);
+	for (var sysName in systems) {
+		var system = systems[sysName];
+		var sysNameCSS = cssName(sysName);
+		var systemOrigin = new MapPoint(system.position.x, system.position.y);
+		console.log('Adding ' + sysName + ' at ' + systemOrigin);
+		var systemColor = 'white';
+		if (system.government && govColors[system.government]) {
+			systemColor = govColors[system.government]
+		}
+		var sysGroup = map.addGroup(sysNameCSS);
+		sysGroup.data = system;
+		sysGroup.hoverCallback = systemHoverCallback;
+		sysGroup.unhoverCallback = systemUnhoverCallback;
+		sysGroup.clickCallback = systemClickCallback;
+		map.addCircle(sysNameCSS + '-circle', systemOrigin, 5, systemColor, 3, sysNameCSS);
+		var textOrigin = new MapPoint(systemOrigin.x, systemOrigin.y + 5 + systemNameSize);
+		map.addText(sysNameCSS + '-name', sysName, textOrigin, 'Ubuntu', systemNameSize, cssBright, 'center', sysNameCSS);
+		for (var linkName of system.links) {
+			if (drawnLinks.includes(linkName + '-' + sysName)) {
+				continue;
+			}
+			var destSystem = systems[linkName];
+			var destOrigin = new MapPoint(destSystem.position.x, destSystem.position.y);
+			var linkLine = map.addLine(cssName('link-' + sysName + '-' + linkName), systemOrigin, destOrigin, cssDim, 3);
+			linkLine.zIndex = -5;
+			drawnLinks.push(sysName + '-' + linkName);
+		}
+		if (sysName == 'Rutilicus') {
+			startOrigin.x = systemOrigin.x;
+			startOrigin.y = systemOrigin.y;
+		}
+	}
+
+	map.settingUp = false;
+	console.log('Centering on ' + startOrigin);
+	map.centerOn(startOrigin);
+}
+</script>
+<script>
+function closeSystemDialog() {
+	systemDisplayDialog.close();
+}
+</script>
+
+<dialog id="systemDisplayDialog">
+	<div id="systemDisplay">
+		<div id="systemDisplayHeader">
+			<div id="systemDisplayHeaderName"></div>
+			<button id="systemDisplayCloseButton" onclick="closeSystemDialog();">X</button>
+		</div>
+		<div id="systemDisplayBody">
+			<div id="sdbName"></div>
+			<div id="sdbGovernment"></div>
+			<div id="sdbPosition"></div>
+			<div id="sdbAttributes"></div>
+		</div>
+		<div id="systemDisplayControls">
+
+		</div>
+	</div>
+</dialog>
+
+</body>
+</html>

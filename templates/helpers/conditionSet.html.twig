@@ -1,0 +1,7 @@
+{% set output = '' %}
+<display-edit-condition-set 
+	setId="{{ setId }}" 
+	label="{{ conditionSetLabel }}">
+	{% include 'helpers/conditionChild.html.twig' %}
+</display-edit-condition-set>
+{{ output|raw }}

@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+
+{% block content %}
+{% set firstChar = '-' %}
+{% for name in shipNames %}
+	{% set newFirstChar = name|slice(0, 1) %}
+	{% if newFirstChar != firstChar %}
+		{% if firstChar != '-' %}</ul>{% endif %}
+		<p>{{ newFirstChar }}</p>
+		<ul>
+		{% set firstChar = newFirstChar %}
+	{% endif %}
+	<li><a href="{{ path('ShipByName', {shipName: name}) }}">{{ name }}</a></li>
+{% endfor %}
+{% endblock %}

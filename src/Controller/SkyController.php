@@ -9,6 +9,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\Form\Extension\Core\Type\TextareaType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Routing\Annotation\Route;
 use Psr\Log\LoggerInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -18,6 +21,7 @@ use App\Service\SkyService;
 use App\Entity\DataNode;
 use App\Entity\DataFile;
 use App\Entity\DataWriter;
+use App\Entity\Plugin;
 use App\Entity\Sky\Conversation;
 use App\Entity\Sky\Mission;
 use App\Entity\Sky\GameData;
@@ -74,17 +78,17 @@ class SkyController extends AbstractController {
 			$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 			$type = substr($Sprite->getPath(), -3);
 			$response->headers->set('Content-Type', 'image/'.$type);
-			
+
 			// Cache the image files each for a week
 			$expires = (60*60*24*7);
 			$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-			
+
 			return $response;
 		} else {
 			throw new NotFoundHttpException('Frame '.$frameId.' of sprite ID '.$spriteId.' was not found.');
 		}
 	}
-	
+
 	#[Route('/sky/dataview/{dataType}', name: 'SkyDataView')]
 	public function data(Request $request, $dataType): Response {
 		$this->loadSkyData();
@@ -93,58 +97,58 @@ class SkyController extends AbstractController {
 		$dataToShow = $skyData[$dataType];
 		$data['dataType'] = $dataType;
 		$data['dataToShow'] = $dataToShow;
-		
+
 		return $this->render('sky/data.html.twig', $data);
 	}
-	
+
 	#[Route('/sky/action/addPlugin', name: 'SkyAddPlugin')]
 	public function addPlugin(Request $request): Response {
 		$pluginName = $request->request->get('pluginName');
 		$pluginPath = $request->request->get('pluginPath');
 		$this->skyService->addPlugin($pluginName, $pluginPath);
 		$this->loadSkyData();
-		
+
 		return $this->json(['success'=>true]);
 	}
-	
+
 	#[Route('/sky/action/removePlugin', name: 'SkyRemovePlugin')]
 	public function removePlugin(Request $request): Response {
 		$pluginName = $request->request->get('pluginName');
 		$this->skyService->removePlugin($pluginName);
 		$this->loadSkyData();
-		
+
 		return $this->json(['success'=>true]);
 	}
-	
+
 	#[Route('/sky/action/clearDataCache', name: 'SkyClearDataCache')]
 	public function clearDataCache(Request $request): Response {
 		$this->skyService->clearDataCache();
-		
+
 		return $this->json(['success'=>true]);
 	}
-	
+
 	#[Route('/sky/action/clearImageCache', name: 'SkyClearImageCache')]
 	public function clearImageCache(Request $request): Response {
 		$this->skyService->clearImageCache();
-		
+
 		return $this->json(['success'=>true]);
 	}
-	
+
 	#[Route('/sky/missions', name: 'SkyMissions')]
 	public function missions(Request $request): Response {
 		$this->loadSkyData();
 
 		$data = [];
-		
+
 		return $this->render('sky/missions.html.twig', $data);
 	}
-	
+
 	#[Route('/sky/missionNames', name: 'SkyMissionNames')]
 	public function missionNames(Request $request): Response {
 		$this->loadSkyData();
-		
+
 		$missions = $this->skyService->getData()['missions'];
-		
+
 		usort($missions, function($a, $b) {
 			if ($a->name > $b->name) {
 				return 1;
@@ -154,27 +158,27 @@ class SkyController extends AbstractController {
 				return 0;
 			}
 		});
-		
+
 		return $this->render('sky/missionNames.html.twig', ['missions'=>$missions]);
 	}
-	
+
 	#[Route('/sky/data/governmentColors.css', name: 'SkyGovColorsCSS')]
 	public function govColorsCSS(Request $request): Response {
 		$govQ = $this->em->createQuery('Select g from App\Entity\Sky\Government g index by g.name');
-		
+
 		$data = ['governments' => $govQ->getResult()];
-		
+
 		$response = $this->render('sky/data/govColors.css.twig', $data);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'text/css');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/sprites.js', name: 'SkySpritesJS')]
 	public function spritesJS(Request $request): Response {
 		$spriteQ = $this->em->createQuery('Select s from App\Entity\Sky\Sprite s index by s.id');
@@ -182,18 +186,18 @@ class SkyController extends AbstractController {
 		foreach ($spriteQ->getResult() as $Sprite) {
 			$sprites[$Sprite->getId()] = $Sprite->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/sprites.js.twig', ['sprites'=>$sprites]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/governments.js', name: 'SkyGovernmentsJS')]
 	public function governmentsJS(Request $request): Response {
 		$govQ = $this->em->createQuery('Select g from App\Entity\Sky\Government g index by g.name');
@@ -201,18 +205,18 @@ class SkyController extends AbstractController {
 		foreach ($govQ->getResult() as $Government) {
 			$governments[$Government->getName()] = $Government->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/governments.js.twig', ['governments'=>$governments]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/systems.js', name: 'SkySystemsJS')]
 	public function systemsJS(Request $request): Response {
 		$sysQ = $this->em->createQuery('Select s from App\Entity\Sky\System s index by s.name');
@@ -221,18 +225,18 @@ class SkyController extends AbstractController {
 			//$this->logger->debug('JSONifying '.$System->getName());
 			$systems[$System->getName()] = $System->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/systems.js.twig', ['systems'=>$systems]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/planets.js', name: 'SkyPlanetsJS')]
 	public function planetsJS(Request $request): Response {
 		$planetQ = $this->em->createQuery('Select s from App\Entity\Sky\Planet s index by s.name');
@@ -243,18 +247,18 @@ class SkyController extends AbstractController {
 			}
 			$planets[$Planet->getName()] = $Planet->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/planets.js.twig', ['planets'=>$planets]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/galaxies.js', name: 'SkyGalaxiesJS')]
 	public function galaxiesJS(Request $request): Response {
 		$galQ = $this->em->createQuery('Select s from App\Entity\Sky\Galaxy s index by s.name');
@@ -262,18 +266,18 @@ class SkyController extends AbstractController {
 		foreach ($galQ->getResult() as $Galaxy) {
 			$galaxies[$Galaxy->getName()] = $Galaxy->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/galaxies.js.twig', ['galaxies'=>$galaxies]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/wormholes.js', name: 'SkyWormholesJS')]
 	public function wormholesJS(Request $request): Response {
 		$wormholeQ = $this->em->createQuery('Select s from App\Entity\Sky\Wormhole s index by s.trueName');
@@ -281,18 +285,18 @@ class SkyController extends AbstractController {
 		foreach ($wormholeQ->getResult() as $Wormhole) {
 			$wormholes[$Wormhole->getTrueName()] = $Wormhole->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/wormholes.js.twig', ['wormholes'=>$wormholes]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/colors.js', name: 'SkyColorsJS')]
 	public function colorsJS(Request $request): Response {
 		$colorQ = $this->em->createQuery('Select s from App\Entity\Sky\Color s index by s.name');
@@ -300,18 +304,18 @@ class SkyController extends AbstractController {
 		foreach ($colorQ->getResult() as $Color) {
 			$colors[$Color->name] = $Color->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/colors.js.twig', ['colors'=>$colors]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/outfits.js', name: 'SkyOutfitsJS')]
 	public function outfitsJS(Request $request): Response {
 		$outfitQ = $this->em->createQuery('Select s from App\Entity\Sky\Outfit s index by s.trueName');
@@ -319,18 +323,18 @@ class SkyController extends AbstractController {
 		foreach ($outfitQ->getResult() as $Outfit) {
 			$outfits[str_replace('"', '\"', $Outfit->getTrueName())] = $Outfit->toJSON(true);
 		}
-		
+
 		$response = $this->render('sky/data/outfits.js.twig', ['outfits'=>$outfits]);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');
 		$response->headers->set('Content-Type', 'application/json');
-		
+
 		// Cache the data files each for a week
 		$expires = (60*60*24*7);
 		$response->headers->set('Cache-Control', 'public, max-age='.$expires);
-		
+
 		return $response;
 	}
-	
+
 	#[Route('/sky/data/ships.js', name: 'SkyShipsJS')]
 	public function shipsJS(Request $request): Response {
 		$shipQ = $this->em->createQuery('Select s from App\Entity\Sky\Ship s');
@@ -429,18 +433,18 @@ class SkyController extends AbstractController {
 		$Conversation->setSourceName('web');
 		$Conversation->setSourceFile('(n/a)');
 		$Conversation->setSourceVersion('new');
-		
+
 		$data = ['conversation'=>$Conversation];
 		$data['conversationCallback'] = 'assignNewConversation';
-		
+
 		return $this->render('sky/conversationEditor.html.twig', $data);
 	}
-	
+
 	#[Route('/sky/loadConversationForm', name: 'SkyLoadConversationForm')]
 	public function loadConversationForm(Request $request): Response {
 		return $this->render('sky/conversationLoadForm.html.twig');
 	}
-	
+
 	#[Route('/sky/loadConversation', name: 'SkyLoadConversation')]
 	public function loadConversation(Request $request): Response {
 		$this->logger->debug('loadConversation() start');
@@ -453,42 +457,42 @@ class SkyController extends AbstractController {
 		$DataFile = new DataFile($sourceInfo, false);
 		$this->logger->debug('loadConversation() loading from string');
 		$DataFile->loadFromString($request->request->get('conversation'));
-		
+
 		$this->logger->debug('loadConversation() creating conversation');
 		$Conversation = new Conversation();
 		$this->logger->debug('loadConversation() loading from data');
 		$convNode = $DataFile->getRoot()->getChildren()[0];
 		$Conversation->load($convNode);
 		$Conversation->setId(-1);
-		
+
 		$this->logger->debug('loadConversation() rendering');
 		$data = ['conversation'=>$Conversation];
 		$data['conversationCallback'] = 'assignConversation';
-		
+
 		return $this->render('sky/conversationEditor.html.twig', $data);
 	}
-	
+
 	#[Route('/sky/writeShip', name: 'SkyEditWriteShip')]
 	public function writeShip(Request $request): Response {
 		if (!$request->request->has('ship')) {
 			$this->addFlash('error','No ship specified for writing!');
 			return new RedirectResponse($this->generateUrl('SkyEditHome'));
 		}
-		
+
 		$Ship = new Ship();
 		$Ship->setFromJSON($request->request->get('ship'));
 		$stringWriter = new DataWriter('');
 		$Ship->save($stringWriter);
-		
+
 		$response = new Response($stringWriter->getString());
 		$response->headers->set('Content-Type','text/plain');
-		
+
 		return $response;
 	}
-	
+
     #[Route('/sky/galaxy', name: 'SkyEditGalaxy')]
     public function galaxy(): Response {
-		
+
 		$data = array();
 		// $data['governments'] = GameData::Governments();
 		// $data['systems'] = GameData::Systems();
@@ -520,11 +524,11 @@ class SkyController extends AbstractController {
 			}
 			$data['links'][$Link->getFromSystem()->getName()] []= $Link->getToSystem();
 		}
-		
+
 		$data['activeWormholes'] = array();
-		
+
 		$this->logger->debug('Marking active wormholes');
-		
+
 		foreach ($data['systems'] as $System) {
 			foreach ($System->getObjects() as $object) {
 				if ($object->planet && $object->planet->isWormhole()) {
@@ -658,37 +662,37 @@ class SkyController extends AbstractController {
 	// 	}
 	// 	return $this->json(['planet'=>$jsonArray]);
 	// }
-	
+
 	// #[Route('/sky/loadtest', name: "LoadTest")]
 	// public function loadTest(Request $request): Response {
 	// 	GameData::Init();
 	// 	GameData::Objects()->load([$_ENV['DATA_PATH']], true);
 	// 	//$file = new DataFile('/Users/tcollett/Development/ThirdParty/endless-sky/data/human/deep missions.txt');
-		
+
 	// 	//$testMission = new Mission();
-		
+
 	// 	$out = '';
-		
+
 	// 	$writer = new DataWriter();
-		
+
 	// 	$test = GameData::Missions()["Deep: Syndicate Convoy"];
 	// 	$test->save($writer, 'test');
-		
+
 	// 	$out = $test->getName()."\n".$writer->getString();
-		
+
 	// 	$response = new Response($out);
 	// 	$response->headers->set('Content-Type','text/plain');
 	// 	return $response;
 	// }
-	
+
 	// #[Route('/sky/missiontest', name: "MissionTest")]
 	// public function missionTest(Request $request): Response {
 	// 	$this->skyService->loadUniverse();
-		
+
 	// 	$data = array();
 	// 	$missions = GameData::Missions();
 	// 	$data['missions'] = $missions;
-		
+
 	// 	// $prerequisites = array();
 	// 	// $reversePrerequisites = array();
 	// 	// $missionNames = array_keys($missions->getContents());
@@ -737,7 +741,7 @@ class SkyController extends AbstractController {
 		} else {
 			throw new NotFoundHttpException();
 		}
-		$fullPath = $rootPath.$path;
+		$fullPath = $rootPath.'/images/'.$path;
 		$type = pathinfo($fullPath)['extension'];
 		$response = new BinaryFileResponse($fullPath);
 		$response->headers->set(AbstractSessionListener::NO_AUTO_CACHE_CONTROL_HEADER, 'true');

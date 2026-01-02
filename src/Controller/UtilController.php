@@ -11,6 +11,9 @@ use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Serializer\Encoder\CsvEncoder;
 use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
@@ -25,6 +28,16 @@ class UtilController extends AbstractController {
 	
 	public function __construct() {
 		$this->dataDir = $_ENV['DATA_PATH'].'data';
+	}
+
+	#[Route("/data/{type}.json", name: "JSONPassthrough")]
+	public function jsonPassthrough(Request $request, string $type, string $projectDir): Response {
+		$file = $projectDir.'/var/data/'.$type.'.json';
+		if (file_exists($file)) {
+			return new BinaryFileResponse($file);
+		} else {
+			throw new NotFoundHttpException('No data file named '.$type.' exists there.');
+		}
 	}
 	
 	#[Route("/util/endlessOutfits", name: "EndlessOutfits")]

@@ -1,0 +1,14 @@
+{% if condition['operator'] == 'var' %}<var-name value="{{ condition['name'] }}">{% elseif condition['operator'] == 'lit' %}<literal value="{{ condition['literal'] }}">{% else %}<op value="{{ condition['operator'] }}">{% endif %}
+	{% for index, child in condition['children'] %}
+		{% set tmp = condition %}
+		{% set tmpId = setId %}
+		{% set tmpLabel = conditionSetLabel %}
+		{% set condition = child %}
+		{% set setId = setId ~ '_child' ~ index %}
+		{% set conditionSetLabel = conditionSetLabel ~ '_child' ~ index %}
+		{% include 'helpers/conditionChild.html.twig' %}
+		{% set condition = tmp %}
+		{% set setId = tmpId %}
+		{% set conditionSetLabel = tmpLabel %}
+	{% endfor %}
+{% if condition['operator'] == 'var' %}</var-name>{% elseif condition['operator'] == 'lit' %}</literal>{% else %}</op>{% endif %}

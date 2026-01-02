@@ -1,0 +1,202 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Swizzle Builder{% endblock %}
+{% block stylesheets %}
+<style>
+#content {
+	position: absolute;
+	top: 30px;
+}
+#container {
+	display: flex;
+	flex-wrap: wrap;
+}
+#spritePane {
+	padding: 1.5rem;
+	display: grid;
+	grid-template-rows: 2rem auto;
+}
+</style>
+{% endblock %}
+{% block lateScripts %}
+<script src="{{ asset("sky/data/sprites.js") }}"></script>
+<script>
+var swizzles = [];
+swizzles[0] = [ [1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[1] = [ [1, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[2] = [ [0, 1, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[3] = [ [0, 0, 1, 0, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[4] = [ [0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[5] = [ [0, 0, 1, 0, 0], [0, 1, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[6] = [ [0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[7] = [ [1, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[8] = [ [1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[9] = [ [0, 0, 1, 0, 0], [0, 0, 1, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[10] = [ [0, 1, 0, 0, 0], [0, 1, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[11] = [ [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[12] = [ [0, 0, 1, 0, 0], [0, 0, 1, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[13] = [ [0, 0, 1, 0, 0], [0, 0, 1, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[14] = [ [0, 1, 0, 0, 0], [0, 1, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[15] = [ [0, 0, 1, 0, 0], [0, 1, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[16] = [ [0, 0, 1, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[17] = [ [0, 1, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[18] = [ [0, 0, 1, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[19] = [ [0, 0, 1, 0, 0], [1, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[20] = [ [0, 1, 0, 0, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[21] = [ [0, 1, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[22] = [ [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[23] = [ [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[24] = [ [0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[25] = [ [1, 0, 0, 0, 0], [0, 0, 1, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[26] = [ [1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[27] = [ [0, 0, 1, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+swizzles[28] = [ [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 1, 0] ];
+$(function() {
+	for (var i in sprites) {
+		$("select[name=sprite]").append('<option value="'+i+'">'+sprites[i].name+'</option>');
+	}
+	updateSprite();
+});
+function updateSprite() {
+	var spriteIndex = $("select[name=sprite]").val();
+	var sprite = sprites[spriteIndex];
+	var imageLoader = new Image();
+	imageLoader.src = '/skyImage/'+sprite.source.file;
+	$("#swizzleSvg").attr('width',sprite.width);
+	$("#swizzleSvg").attr('height',sprite.height);
+	$("#swizzleSvg").attr('viewBox','0 0 '+sprite.width+' '+sprite.height);
+	$("#swizzledSprite").attr('xlink:href','/skyImage/'+sprite.source.file);
+	imageLoader.onload = function() {
+		$("#swizzleSvg").html($("#swizzleSvg").html());
+	};
+}
+var fromArray = ['r','g','b','a','c'];
+var toArray = ['r','g','b','a'];
+function updateSwizzle() {
+	var matrixValues = '';
+	for (var i=0; i<toArray.length; i++) {
+		for (var j=0; j<fromArray.length; j++) {
+			if (j != 0) {
+				matrixValues += ' ';
+			}
+			var cellName = fromArray[j]+'2'+toArray[i];
+			matrixValues += $("input[name="+cellName+"]").val();
+		}
+		if (i != toArray.length - 1) {
+			matrixValues += '\n';
+		}
+	}
+	$("#swizzle > feColorMatrix").attr('values',matrixValues);
+	$("#swizzleSvg").html($("#swizzleSvg").html());
+}
+function setSwizzle() {
+	var newSwizzleId = parseInt($("select[name=oldSwizzle]").val());
+	var swizzleMatrix = swizzles[newSwizzleId];
+	for (var i=0; i<swizzleMatrix.length; i++) {
+		for (var j=0; j<swizzleMatrix[i].length; j++) {
+			var cellName = fromArray[j] + '2' + toArray[i];
+			$("input[name="+cellName+"]").val(swizzleMatrix[i][j]);
+		}
+	}
+	updateSwizzle();
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div id="container">
+<div id="spritePane">
+	<select name="sprite" onchange="updateSprite();">
+	</select>
+	<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" id="swizzleSvg">
+		<defs>
+			<filter id="swizzle">
+				<feColorMatrix
+				  in="SourceGraphic"
+				  type="matrix"
+				  values="1 0 0 0 0
+						  0 1 0 0 0
+						  0 0 1 0 0
+						  0 0 0 1 0" />
+			</filter>
+		</defs>
+		<g id="swizzled">
+			<image class="swizzleReady" id="swizzledSprite" xlink:href="" x="0" y="0" filter="url(#swizzle)" />
+		</g>
+	</svg>
+</div>
+<div id="controlPane">
+	<div>Existing Swizzle: <select name="oldSwizzle" onchange="setSwizzle();">
+		<option value="0">red + yellow markings (republic)</option>
+		<option value="1">red + magenta markings</option>
+		<option value="2">green + yellow (free worlds)</option>
+		<option value="3">green + cyan</option>
+		<option value="4">blue + magenta (syndicate)</option>
+		<option value="5">blue + cyan (merchant)</option>
+		<option value="6">red and black (pirate)</option>
+		<option value="7">pure red</option>
+		<option value="8">faded red</option>
+		<option value="9">pure black</option>
+		<option value="10">faded black</option>
+		<option value="11">pure white</option>
+		<option value="12">darkened blue</option>
+		<option value="13">pure blue</option>
+		<option value="14">faded blue</option>
+		<option value="15">darkened cyan</option>
+		<option value="16">pure cyan</option>
+		<option value="17">faded cyan</option>
+		<option value="18">darkened green</option>
+		<option value="19">pure green</option>
+		<option value="20">faded green</option>
+		<option value="21">darkened yellow</option>
+		<option value="22">pure yellow</option>
+		<option value="23">faded yellow</option>
+		<option value="24">darkened magenta</option>
+		<option value="25">pure magenta</option>
+		<option value="26">faded magenta</option>
+		<option value="27">red only (cloaked)</option>
+		<option value="28">black only (outline)</option>
+	</select></div>
+	<table>
+		<tr><th>Output Channel</th><th>Input R</th><th>Input G</th><th>Input B</th><th>Input A</th><th>Input Constant</th></tr>
+		<tr>
+			<th>R</th>
+			<td><input type="number" name="r2r" step="0.01" min="-10" max="10" value="1"></td>
+			<td><input type="number" name="g2r" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="b2r" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="a2r" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="c2r" step="0.01" min="-10" max="10" value="0"></td>
+		</tr>
+		<tr>
+			<th>G</th>
+			<td><input type="number" name="r2g" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="g2g" step="0.01" min="-10" max="10" value="1"></td>
+			<td><input type="number" name="b2g" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="a2g" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="c2g" step="0.01" min="-10" max="10" value="0"></td>
+		</tr>
+		<tr>
+			<th>B</th>
+			<td><input type="number" name="r2b" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="g2b" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="b2b" step="0.01" min="-10" max="10" value="1"></td>
+			<td><input type="number" name="a2b" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="c2b" step="0.01" min="-10" max="10" value="0"></td>
+		</tr>
+		<tr>
+			<th>A</th>
+			<td><input type="number" name="r2a" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="g2a" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="b2a" step="0.01" min="-10" max="10" value="0"></td>
+			<td><input type="number" name="a2a" step="0.01" min="-10" max="10" value="1"></td>
+			<td><input type="number" name="c2a" step="0.01" min="-10" max="10" value="0"></td>
+		</tr>
+		<tr>
+			<td colspan="5">
+				<button type="button" onclick="updateSwizzle();">Update Swizzle</button>
+			</td>
+		</tr>
+	</table>
+</div>
+</div>
+{% endblock %}

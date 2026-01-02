@@ -20,6 +20,9 @@ $(function () {
 		<a href="https://www.patreon.com/delvin_anaris" target="_blank" title="Support the creator on Patreon!"><img src="{{ asset("images/Digital-Patreon-Logo_FieryCoral.png") }}" style="width: 16px; height: 16px;"></a>
 	</div>
 	<div>
+		<div style="margin-left: 2em;">{% if app.user %}Logged in as: {{ app.user.username }}{% else %}<a href="{{ path("SkyLogin") }}" title="Log In">👤</a>{% endif %}</div>
+	</div>
+	<div>
 		{% if source is defined %}
 		Source: <span id="sourceFile">{{ source['file'] }}</span> (<span id="sourceName">{{ source['name'] }}</span> <span id="sourceVersion">{{ source['version'] }})</span>
 		{% endif %}

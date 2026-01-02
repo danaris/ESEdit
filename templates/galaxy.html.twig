@@ -1,0 +1,257 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Galaxy ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}<style>
+.system {
+	stroke: gray;
+	cursor: pointer;
+}
+{{ errorLog('gov CSS now') }}
+{% for governmentName, government in governments %}
+	{{ errorLog('doing CSS for government named "' ~ governmentName ~ '"') }}
+	{% if government.color is defined and government.color != '' %}
+		{% set govColor = colorToCSS(government.color) %}
+	{% else %}
+		{% set govColor = false %}
+	{% endif %}
+	{% if govColor %}
+.{{ governmentName|raw|cssNameEsc }} {
+	stroke: {{ govColor }};
+	fill: black;
+}
+.{{ governmentName|raw|cssNameEsc }}.unoccupied {
+	fill: {{ govColor }};
+	stroke: rgb(102,102,102);
+}
+	{% else %}
+/* No color for government {{ governmentName }} */
+	{% endif %}
+	{{ errorLog('done with that gov') }}
+{% endfor %}
+.Uninhabited.unoccupied {
+	fill: black;
+	stroke: rgb(102,102,102);
+}
+.systemName {
+	fill-opacity: 0.7;
+	fill: white;
+	cursor: pointer;
+}
+.systemName.hidden {
+	fill-opacity: 0.4;
+}
+.systemName:hover {
+	fill-opacity: 1.0;
+}
+.systemName.hidden:hover {
+	fill-opacity: 0.7;
+}
+#systemDialog {
+	display: none;
+}
+.systemChildObjects {
+	margin-left: 2em;
+}
+</style>{% endblock %}
+
+{% block content %}
+<script>
+var systems = {};
+{{ errorLog('system loop now') }}
+{% for systemName, system in systems %}
+	{{ errorLog('System "' ~ systemName ~ '"') }}
+systems['{{ systemName|cssNameEsc }}'] = {name: '{{ systemName|cssNameEsc }}', government: '{% if system.government is defined and system.government %}{{ errorLog('- Attempting gov name') }}{{ errorLog(system.government) }}{{ system.government.name|raw|cssNameEsc }}{% endif %}', hidden: {% if system.hidden %}true{% else %}false{% endif %}, attributes: '{{ system.attributes|join(',')|cssNameEsc }}' };
+systems['{{ systemName|cssNameEsc }}'].objects = [];
+	{% for object in system.objects %}
+		{% if object.planet %}
+			{% if object.planet.isWormhole() %}
+				{% set isWormhole = 'true' %}
+			{% else %}
+				{% set isWormhole = 'false' %}
+			{% endif %}
+		{% else %}
+			{% set isWormhole = 'false' %}
+		{% endif %}
+systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if object.planet %}name: '{{ object.planet.name|cssNameEsc }}', {% endif %}isWormhole: {{ isWormhole }}, sprite: '{{ object.sprite.name }}', distance: {{ object.distance }}{#, period: {{ object.speed / 360 }}, offset: {{ object.offset }}#} });
+		{# {% for child in object.children %}
+			{% if child.planet %}
+				{% if child.planet.isWormhole() %}
+					{% set isWormhole = 'true' %}
+				{% else %}
+					{% set isWormhole = 'false' %}
+				{% endif %}
+			{% else %}
+				{% set isWormhole = 'false' %}
+			{% endif %}
+			{% if object.planet %}
+				{% set parentName = object.planet.name %}
+			{% else %}
+				{% set parentName = object.sprite.name %}
+			{% endif %}
+systems['{{ systemName|cssNameEsc }}'].objects.push({ {% if child.planet %}name: '{{ child.planet.name|cssNameEsc }}', {% endif %}isWormhole: {{ isWormhole }}, sprite: '{{ child.sprite.name }}', distance: {{ child.distance }}, period: {{ child.speed / 360 }}, offset: {{ child.offset }}, childOf: '{{ parentName }}' });
+		{% endfor %} #}
+	{% endfor %}
+{% endfor %}
+{{ errorLog('system loop done') }}
+</script>
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 4096 4096" id="galaxySvg">
+	<defs>
+		<g id="system">
+			<circle cx="0" cy="0" r="5" stroke-width="3" />
+		</g>
+		<g id="arrow">
+			<g>
+				<path d="M 8,-4 L 0,0 L 8,4 L 8,-4" />
+			</g>
+		</g>
+		<g id="revArrow">
+			<g>
+				<path d="M 25,-8 L 41,0 L 25,8" fill="none" />
+			</g>
+		</g>
+	</defs>
+	<g id="galaxyMap">
+	{% for galaxyName, galaxy in galaxies %}
+		{{ errorLog('Galaxy name: ' ~ galaxyName) }}
+		<!-- Galaxy sprite: {{ galaxyName }} = {{ galaxy.sprite }} -->
+		{{ errorLog('~ Checking sprite validity') }}
+		{% if galaxy.sprite %}
+			<!-- Galaxy sprite valid -->
+			{{ errorLog('~ Getting sprite path') }}
+		<image id="{{ galaxyName }}-sprite" xlink:href="{{ path('SpritePath', {path: extSpritePath(galaxy.sprite)}) }}" {{ errorLog("Got path, getting position") }} x="{{ 2048 + galaxy.position.x - (galaxy.sprite.width/2) }}" y="{{ 2048 + galaxy.position.y - (galaxy.sprite.height/2) }}" />
+		{% endif %}
+	{% endfor %}
+	</g>
+	<g id="systemLinks">
+	{% for fromName, fromSystem in systems %}
+		{% for toSystem in fromSystem.links %}
+			{% if fromSystem.position is defined %}
+				{% if toSystem.position is defined %}
+			<line id="{{ fromName|raw|cssNameEsc }}-{{ toSystem.name|raw|cssNameEsc }}-link" x1="{{ 2048 + fromSystem.position.x }}" y1="{{ 2048 + fromSystem.position.y }}" x2="{{ 2048 + toSystem.position.x }}" y2="{{ 2048 + toSystem.position.y }}" stroke-opacity="0.7" style="stroke-width: 1px; stroke: lightgray;"/>
+				{% else %}
+				<!-- {{ dump(toSystem) }} -->
+				{% endif %}
+			{% else %}
+			<!-- {{ dump(fromSystem) }} -->
+			{% endif %}
+		{% endfor %}
+	{% endfor %}
+	</g>
+	<g id="wormholes">
+	{# {% for wormholeName, wormhole in wormholes %}
+		<!-- Checking for wormhole links from {{ wormhole.planet.trueName }} -->
+		{% for fromName, toSystem in wormhole.links %}
+			<!-- Drawing link from {{ fromName }} to {{ toSystem.name }} -->
+			{% if systems[fromName] is defined and toSystem is defined %}
+				{% if wormhole.linkColor is defined %}
+					{% set wormholeColor = colorToCSS(wormhole.linkColor) %}
+				{% else %}
+					{% set wormholeColor = colorToCSS(colors['map wormhole']) %}
+				{% endif %}
+				{% set fromSystem = systems[fromName] %}
+				{% set angle = angleBetween(fromSystem.position, toSystem.position) %}
+				<line class="wormhole" id="{{ fromName|raw|cssNameEsc }}-{{ toSystem.name|raw|cssNameEsc }}-hole" x1="{{ 2048 + fromSystem.position.x }}" y1="{{ 2048 + fromSystem.position.y }}" x2="{{ 2048 + toSystem.position.x }}" y2="{{ 2048 + toSystem.position.y }}" stroke="{{ wormholeColor }}" {% if activeWormholes[wormhole.planet.trueName] is defined and activeWormholes[wormhole.planet.trueName] %}stroke-opacity="0.7"{% else %}stroke-opacity="0.3"{% endif %} style="stroke-width: 2px;"/>
+				<use class="wormhole" x="{{ 2048 + fromSystem.position.x }}" y="{{ 2048 + fromSystem.position.y }}" href="#revArrow" stroke-width="2"{% if wormholeColor %} stroke="{{ wormholeColor }}"{% endif %} transform="rotate({{ angle }} {{ 2048 + fromSystem.position.x }} {{ 2048 + fromSystem.position.y }})" />
+			{% else %}
+			<!-- Can't display wormhole from {{ fromName }} to {{ toSystem.name }} -->
+			{% endif %}
+		{% endfor %}
+	{% endfor %} #}
+	</g>
+	<g id="systems">
+	{% for systemName, system in systems %}
+		{% set nameLen = systemName|length %}
+		{% set xOffset = 8 * nameLen / 2 %}
+		{% set yOffset = 16 %}
+		{% set sysStatus = 'unoccupied' %}
+		{% if system.government and system.government.name != 'Uninhabited' and system.isInhabited() %}
+			{% set sysStatus = 'occupied' %}
+		{% endif %}
+		{% if system.position is defined %}
+		<use id="{{ systemName|raw|cssNameEsc }}-system"{% if system.hidden %} stroke-opacity="0.5"{% endif %} class="system {{ system.government.name|raw|cssNameEsc }} {{ sysStatus }}" x="{{ 2048 + system.position.x }}" y="{{ 2048 + system.position.y }}" onclick="showSystem('{{ systemName|raw|cssNameEsc }}');" href="#system"><title>{{ system.name }}</title></use>
+		<text id="{{ systemName|raw|cssNameEsc }}-systemName" class="systemName{% if system.hidden %} hidden{% endif %}" x="{{ 2048 + system.position.x - xOffset }}" y="{{ 2048 + system.position.y + yOffset }}" onclick="showSystem('{{ systemName|raw|cssNameEsc }}');">{{ systemName }}</text>
+		{% else %}
+		<!-- dump(system) -->
+		{% endif %}
+	{% endfor %}
+	</g>
+</svg>
+
+{# <div class="error">
+	{% for error in errors %}
+	<p>{{ error }}</p>
+	{% endfor %}
+</div> #}
+
+{# <div class="debug">
+	{# Images:
+	{{ dump(images) }}
+	{# Data:
+	<pre>{{ data }}</pre>
+	Govs:
+	{{ dump(governments) }}
+	Colors:
+	<pre>{{ dump(colors) }}</pre>
+	Wormholes:
+	{{ dump(wormholes) }}
+	Escape tests:<br>
+	html: {{ testSystem.name|escape }}<br>
+	js: {{ testSystem.name|e('js') }}<br>
+	css: {{ testSystem.name|raw|cssNameEsc }}<br>
+	url: {{ testSystem.name|e('url') }}<br>
+	html_attr: {{ testSystem.name|e('html_attr') }}<br>
+
+</div> #}
+{% for systemName, system in systems %}
+<div id="systemDetails-{{ systemName|raw|cssNameEsc }}" class="systemDetails">
+	<div class="sysDetail systemName">{{ system.name }}{% if system.hidden %} (hidden){% endif %}</div>
+	<div class="sysDetail systemGovernment {{ system.government.name|raw|cssNameEsc }}">{{ system.government.name }}</div>
+	<div class="sysDetail systemAttributes">{{ system.attributes|join(', ') }}</div>
+	<div class="sysDetail systemObjects">
+	{% for object in system.objects %}
+		<p>System Objects:</p>
+		{% if object.planet %}<div class="sysObjectName">{{ object.planet.name }}</div>{% endif %}
+		<div class="sysDetail sysObjectSprite">Sprite: {{ object.sprite.name }}</div>
+		<div class="sysDetail sysObjectDistance">Distance: {{ object.distance }}</div>
+		{# <div class="sysDetail sysObjectPeriod">Period: {{ object.speed / 360 }}</div>
+		{% if object.offset %}<div class="sysDetail sysObjectOffset">Offset: {{ object.offset }}</div>{% endif %}#}
+		{# {% if object.children|length > 0 %}
+		<div class="sysDetail systemChildObjects">
+			<p>Children:</p>
+			{% for child in object.children %}
+			{% if child.planet %}<div class="sysObjectName">{{ child.planet.name }}</div>{% endif %}
+			<div class="sysDetail sysObjectSprite">Sprite: {{ child.sprite.name }}</div>
+			<div class="sysDetail sysObjectDistance">Distance: {{ child.distance }}</div>
+			<div class="sysDetail sysObjectPeriod">Period: {{ child.speed / 360 }}</div>
+			{% if child.offset %}<div class="sysDetail sysObjectOffset">Offset angle: {{ child.offset }}</div>{% endif %}
+			{% endfor %}
+		</div>
+		{% endif %} #}
+	{% endfor %}
+	</div>
+</div>
+{% endfor %}
+<div id="systemDialog" title="System View">
+</div>
+{% endblock %}
+
+{% block lateScripts %}
+<script>
+function showSystem(systemName) {
+	$("#systemDialog").html('');
+	$("#systemDetails-"+systemName).appendTo("#systemDialog");
+	$("#systemDialog").dialog("open");
+}
+$(function() {
+	$("#systemDialog").dialog({
+		  autoOpen: false,
+		  height: 600,
+		  width: 550,
+		  modal: true,
+		  close: function() {
+			  $("#systemDialog").dialog('close');
+		  }
+		});
+});
+</script>
+{% endblock %}

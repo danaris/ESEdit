@@ -1,0 +1,10 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Outfit Comparison ~ Endless Sky Editor{% endblock %}
+{% block lateScripts %}
+<script src="{{ asset("js/vendor/chart.js/chart.js.index.js") }}"></src>
+{% endblock %}
+
+{% block content %}
+{{ render_chart(chart) }}
+{% endblock %}

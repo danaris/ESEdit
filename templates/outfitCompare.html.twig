@@ -1,0 +1,18 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Outfit Comparison ~ Endless Sky Editor{% endblock %}
+
+{% block content %}
+<datalist id="outfitAttributes">
+	{% for attribute in outfitAttributes %}
+	<option>{{ attribute }}</option>
+	{% endfor %}
+</datalist>
+
+<p>Please choose two outfit attributes to compare.</p>
+<form action="{{ path("OutfitAttributeCompare") }}">
+	<p>Y-axis: <input type="text" name="yAttr" list="outfitAttributes"></p>
+	<p>X-axis: <input type="text" name="xAttr" list="outfitAttributes"></p>
+	<input type="submit" value="graph">
+</form>
+{% endblock %}

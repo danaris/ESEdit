@@ -1,0 +1,97 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Galaxy ~ Endless Sky Editor{% endblock %}
+{% block stylesheets %}
+<link rel="stylesheet" href="{{ asset("css/govColors.css") }}">
+<style>
+.system {
+	stroke: gray;
+	cursor: pointer;
+}
+.Uninhabited.unoccupied {
+	fill: black;
+	stroke: rgb(102,102,102);
+}
+.systemName {
+	fill-opacity: 0.7;
+	fill: white;
+	cursor: pointer;
+}
+.systemName.hidden {
+	fill-opacity: 0.4;
+}
+.systemName:hover {
+	fill-opacity: 1.0;
+}
+.systemName.hidden:hover {
+	fill-opacity: 0.7;
+}
+#systemDialog {
+	display: none;
+}
+.systemChildObjects {
+	margin-left: 2em;
+}
+</style>
+{% endblock %}
+{% block javascripts %}
+<script src="{{ asset("sky/data/colors.js") }}"></script>
+<script src="{{ asset("sky/data/galaxies.js") }}"></script>
+<script src="{{ asset("sky/data/sprites.js") }}"></script>
+<script src="{{ asset("sky/data/governments.js") }}"></script>
+<script src="{{ asset("sky/data/planets.js") }}"></script>
+<script src="{{ asset("sky/data/systems.js") }}"></script>
+<script src="{{ asset("sky/data/wormholes.js") }}"></script>
+{% endblock %}
+
+{% block content %}
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 4096 4096" id="galaxySvg">
+	<defs>
+		<g id="system">
+			<circle cx="0" cy="0" r="5" stroke-width="3" />
+		</g>
+		<g id="arrow">
+			<g>
+				<path d="M 8,-4 L 0,0 L 8,4 L 8,-4" />
+			</g>
+		</g>
+		<g id="revArrow">
+			<g>
+				<path d="M 25,-8 L 41,0 L 25,8" fill="none" />
+			</g>
+		</g>
+	</defs>
+	<g id="galaxyMap">
+	</g>
+	<g id="systemLinks">
+	</g>
+	<g id="wormholes">
+	</g>
+	<g id="systems">
+	</g>
+</svg>
+
+<div id="systemDialog" title="System View">
+</div>
+{% endblock %}
+
+{% block lateScripts %}
+<script>
+function showSystem(systemName) {
+	$("#systemDialog").html('');
+	$("#systemDetails-"+systemName).appendTo("#systemDialog");
+	$("#systemDialog").dialog("open");
+}
+$(function() {
+	$("#systemDialog").dialog({
+		  autoOpen: false,
+		  height: 600,
+		  width: 550,
+		  modal: true,
+		  close: function() {
+			  $("#systemDialog").dialog('close');
+		  }
+		});
+});
+</script>
+{% endblock %}

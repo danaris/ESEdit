@@ -1,0 +1,20 @@
+{% extends 'sky/base.html.twig' %}
+
+{% block title %}Plugin List{% endblock %}
+
+{% block content %}
+<p>If you want to create your own content for Endless Sky, rather than editing the vanilla data files, you will need to create a Plugin. Here is a list of all the current Plugins registered in ESEdit.</p>
+
+<p><a href="{{ path("SkyNewPlugin") }}">New Plugin</a></p>
+<table id="pluginTable">
+	<thead>
+		<tr><th>Name</th><th>Creator</th><th>Description</th></tr>
+	</thead>
+	<tbody>
+		{% for plugin in plugins %}
+		<tr><td>{% if plugin.author == app.user %}<a href="{{ path("SkyEditPlugin", {pluginId: plugin.id}) }}">{{ plugin.name }}</a>{% else %}{{ plugin.name }}{% endif %}</td><td>{{ plugin.author.username }}</td><td>{{ plugin.description }}</td></tr>
+		{% endfor %}
+	</tbody>
+</table>
+
+{% endblock %}

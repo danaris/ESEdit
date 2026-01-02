@@ -587,7 +587,7 @@ class Conversation {
 	}
 	
 	// Get the scene image, if any, associated with the given node.
-	public function scene(int $node): Sprite {
+	public function scene(int $node): ?Sprite {
 		if (!$this->nodeIsValid($node)) {
 			return null;
 		}

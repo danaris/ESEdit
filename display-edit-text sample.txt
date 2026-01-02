@@ -1,0 +1,3 @@
+<div id="missionNameContainer" class="editableContainer" style="width: 40em;">
+		<label for="missionNameField">Mission Name:</label><img src="{{ asset('images/pencil-gray-16.png') }}" style="width: 16px; height: 16px;"><div class="displayField" onclick="toggleEditable(event);">{{ Mission.trueName }}</div><input class="editableField" type="text" name="missionNameField" id="missionNameField" value="{{ Mission.trueName }}" onfocusout="toggleEditable(event);">
+	</div>
